@@ -1,30 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 // @ts-ignore
 import { LayoutDashboard, TableProperties, LineChart } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import CashFlow from './pages/CashFlow';
-import dataJson from './data/tambo_data.json';
-import type { Transaction } from './utils/calculations';
+
+import { useSupabaseTransactions } from './lib/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'cashflow'>('dashboard');
   
-  const [data, setData] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('tambo_transactions');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    return dataJson.baseDeDatos as unknown as Transaction[];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('tambo_transactions', JSON.stringify(data));
-  }, [data]);
-
-  const handleAddTransaction = (newTx: Transaction) => {
-    setData([...data, newTx]);
-  };
+  const { data, loading, addTransaction: handleAddTransaction } = useSupabaseTransactions();
 
   return (
     <div className="flex h-screen bg-[#faf9f6]">
@@ -93,9 +79,17 @@ function App() {
           </header>
           
           <div className="p-8 flex-1">
-            {activeTab === 'dashboard' && <Dashboard data={data} />}
-            {activeTab === 'cashflow' && <CashFlow data={data} />}
-            {activeTab === 'transactions' && <Transactions data={data} onAdd={handleAddTransaction} />}
+            {loading ? (
+              <div className="flex items-center justify-center h-64 text-[#6b645c]">
+                Cargando datos desde Supabase...
+              </div>
+            ) : (
+              <>
+                {activeTab === 'dashboard' && <Dashboard data={data} />}
+                {activeTab === 'cashflow' && <CashFlow data={data} />}
+                {activeTab === 'transactions' && <Transactions data={data} onAdd={handleAddTransaction} />}
+              </>
+            )}
           </div>
         </div>
       </main>
