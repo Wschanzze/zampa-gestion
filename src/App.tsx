@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+// @ts-ignore
 import { LayoutDashboard, TableProperties, LineChart } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
@@ -8,26 +9,41 @@ import type { Transaction } from './utils/calculations';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'cashflow'>('dashboard');
-  const [data, setData] = useState<Transaction[]>(dataJson.baseDeDatos as unknown as Transaction[]);
+  
+  const [data, setData] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('tambo_transactions');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return dataJson.baseDeDatos as unknown as Transaction[];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tambo_transactions', JSON.stringify(data));
+  }, [data]);
 
   const handleAddTransaction = (newTx: Transaction) => {
     setData([...data, newTx]);
-    // In a real app, this would also push to a backend/Supabase
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-[#faf9f6]">
       {/* Sidebar */}
-      <aside className="w-64 bg-indigo-900 text-white flex flex-col">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold">Gestión Tambo</h1>
-          <p className="text-indigo-200 text-sm mt-1">Ovino & Quesería</p>
+      <aside className="w-64 bg-[#f4ebd8] text-[#3e3a35] flex flex-col border-r border-[#e0d6c8] shadow-sm relative z-20">
+        <div className="p-6 flex flex-col items-center">
+          <img src="/logo negro.png" alt="Zampa Gestión" className="w-24 mb-4 opacity-90 mix-blend-multiply" />
+          <h1 className="text-xl font-bold text-center">Gestión Tambo</h1>
+          <p className="text-[#6b645c] text-sm mt-1 text-center">Ovino & Quesería</p>
         </div>
         
         <nav className="flex-1 px-4 space-y-2">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-800 text-white' : 'text-indigo-200 hover:bg-indigo-800/50'}`}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
+              activeTab === 'dashboard' 
+                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#6b645c] hover:bg-[#eae0cd]'
+            }`}
           >
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
@@ -35,7 +51,11 @@ function App() {
           
           <button
             onClick={() => setActiveTab('cashflow')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'cashflow' ? 'bg-indigo-800 text-white' : 'text-indigo-200 hover:bg-indigo-800/50'}`}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
+              activeTab === 'cashflow' 
+                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#6b645c] hover:bg-[#eae0cd]'
+            }`}
           >
             <LineChart size={20} />
             <span>Flujo de Caja</span>
@@ -43,7 +63,11 @@ function App() {
           
           <button
             onClick={() => setActiveTab('transactions')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'transactions' ? 'bg-indigo-800 text-white' : 'text-indigo-200 hover:bg-indigo-800/50'}`}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
+              activeTab === 'transactions' 
+                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#6b645c] hover:bg-[#eae0cd]'
+            }`}
           >
             <TableProperties size={20} />
             <span>Base de Datos</span>
@@ -52,19 +76,27 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b border-gray-200 px-8 py-4">
-          <h2 className="text-xl font-semibold text-gray-800">
-            {activeTab === 'dashboard' && 'Resumen por Unidad de Negocio'}
-            {activeTab === 'cashflow' && 'Flujo de Caja Mensual'}
-            {activeTab === 'transactions' && 'Movimientos (Base de Datos)'}
-          </h2>
-        </header>
+      <main className="flex-1 overflow-auto relative bg-[#fdfdfc]">
+        {/* Watermark Background */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-[0.03] bg-center bg-no-repeat bg-cover z-0"
+          style={{ backgroundImage: 'url("/ovejas_render.png")' }}
+        />
         
-        <div className="p-8">
-          {activeTab === 'dashboard' && <Dashboard data={data} />}
-          {activeTab === 'cashflow' && <CashFlow data={data} />}
-          {activeTab === 'transactions' && <Transactions data={data} onAdd={handleAddTransaction} />}
+        <div className="relative z-10 flex flex-col h-full">
+          <header className="bg-white/80 backdrop-blur-sm border-b border-[#e0d6c8] px-8 py-4 shadow-sm sticky top-0 z-20">
+            <h2 className="text-xl font-semibold text-[#3e3a35]">
+              {activeTab === 'dashboard' && 'Resumen por Unidad de Negocio'}
+              {activeTab === 'cashflow' && 'Flujo de Caja Mensual'}
+              {activeTab === 'transactions' && 'Movimientos (Base de Datos)'}
+            </h2>
+          </header>
+          
+          <div className="p-8 flex-1">
+            {activeTab === 'dashboard' && <Dashboard data={data} />}
+            {activeTab === 'cashflow' && <CashFlow data={data} />}
+            {activeTab === 'transactions' && <Transactions data={data} onAdd={handleAddTransaction} />}
+          </div>
         </div>
       </main>
     </div>

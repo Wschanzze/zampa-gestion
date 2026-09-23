@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { parseCurrency } from '../utils/calculations';
 import type { Transaction } from '../utils/calculations';
 import TransactionForm from '../components/TransactionForm';
+// @ts-ignore
 import { Plus } from 'lucide-react';
 
 interface TransactionsProps {
@@ -12,14 +14,14 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
   const [showForm, setShowForm] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] overflow-hidden">
       
       {/* Header action */}
-      <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-        <h3 className="text-lg font-semibold text-gray-800">Historial de Movimientos</h3>
+      <div className="p-4 border-b border-[#e0d6c8] flex justify-between items-center bg-[#fdfdfc]">
+        <h3 className="text-lg font-semibold text-[#3e3a35]">Historial de Movimientos</h3>
         <button 
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center space-x-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition-colors"
+          className="flex items-center space-x-1 px-3 py-2 bg-[#8b7355] text-white rounded-lg text-sm hover:bg-[#7a6448] shadow-sm transition-colors font-medium"
         >
           <Plus size={16} />
           <span>Nuevo Movimiento</span>
@@ -30,7 +32,7 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left">
-          <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+          <thead className="text-xs text-[#6b645c] uppercase bg-[#f4ebd8]/50 border-b border-[#e0d6c8]">
             <tr>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Prov/Cliente</th>
@@ -44,31 +46,36 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
             </tr>
           </thead>
           <tbody>
-            {data.map((row, idx) => (
-              <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-3 whitespace-nowrap">{row.Fecha}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">{row['Prov/Cliente']}</td>
-                <td className="px-4 py-3">{row.Cuenta}</td>
-                <td className="px-4 py-3 text-right text-emerald-600">{row.Ingresos}</td>
-                <td className="px-4 py-3 text-right text-rose-600">{row.Egresos}</td>
-                <td className="px-4 py-3">{row.Rubro}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium
-                    ${row.Subactividad?.toUpperCase() === 'TAMBO' ? 'bg-blue-100 text-blue-800' : ''}
-                    ${row.Subactividad?.toUpperCase() === 'QUESERIA' ? 'bg-amber-100 text-amber-800' : ''}
-                    ${row.Subactividad?.toUpperCase() === 'RECRIA' ? 'bg-green-100 text-green-800' : ''}
-                    ${row.Subactividad?.toUpperCase() === 'COMUN' ? 'bg-gray-100 text-gray-800' : ''}
-                  `}>
-                    {row.Subactividad || 'COMUN'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-500">{row['Subrubro/Producto']}</td>
-                <td className="px-4 py-3 text-right font-medium">{row.Cantidades}</td>
-              </tr>
-            ))}
+            {data.map((row, idx) => {
+              const ingresosParsed = parseCurrency(row.Ingresos);
+              const egresosParsed = parseCurrency(row.Egresos);
+              
+              return (
+                <tr key={idx} className="border-b border-[#e0d6c8]/50 hover:bg-[#f4ebd8]/30 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap text-[#3e3a35]">{row.Fecha}</td>
+                  <td className="px-4 py-3 font-medium text-[#3e3a35]">{row['Prov/Cliente']}</td>
+                  <td className="px-4 py-3 text-[#6b645c]">{row.Cuenta}</td>
+                  <td className="px-4 py-3 text-right font-medium text-emerald-600">{ingresosParsed > 0 ? `$${ingresosParsed.toLocaleString('es-AR')}` : '-'}</td>
+                  <td className="px-4 py-3 text-right font-medium text-rose-600">{egresosParsed > 0 ? `$${egresosParsed.toLocaleString('es-AR')}` : '-'}</td>
+                  <td className="px-4 py-3 text-[#3e3a35]">{row.Rubro}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium border
+                      ${row.Subactividad?.toUpperCase() === 'TAMBO' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
+                      ${row.Subactividad?.toUpperCase() === 'QUESERIA' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
+                      ${row.Subactividad?.toUpperCase() === 'RECRIA' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                      ${row.Subactividad?.toUpperCase() === 'COMUN' ? 'bg-[#f4ebd8] text-[#6b645c] border-[#e0d6c8]' : ''}
+                    `}>
+                      {row.Subactividad || 'COMUN'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-[#6b645c]">{row['Subrubro/Producto']}</td>
+                  <td className="px-4 py-3 text-right font-medium text-[#3e3a35]">{row.Cantidades || '-'}</td>
+                </tr>
+              );
+            })}
             {data.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-[#6b645c]">
                   No hay transacciones registradas
                 </td>
               </tr>

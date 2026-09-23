@@ -7,41 +7,92 @@ interface Props {
 }
 
 const TransactionForm: React.FC<Props> = ({ onAdd, onClose }) => {
+  const [tipoMovimiento, setTipoMovimiento] = useState<'INGRESO' | 'EGRESO'>('INGRESO');
   const [formData, setFormData] = useState<Partial<Transaction>>({
     Fecha: new Date().toLocaleDateString('es-AR'),
     Subactividad: 'TAMBO',
+    Cuenta: 'EFECTIVO'
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleMontoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value) || 0;
+    if (tipoMovimiento === 'INGRESO') {
+      setFormData({ ...formData, Ingresos: val, Egresos: 0 });
+    } else {
+      setFormData({ ...formData, Egresos: val, Ingresos: 0 });
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.Fecha) return;
-    onAdd(formData as Transaction);
+    
+    // Ensure numeric values
+    const finalData = {
+      ...formData,
+      Ingresos: Number(formData.Ingresos) || 0,
+      Egresos: Number(formData.Egresos) || 0,
+      Cantidades: Number(formData.Cantidades) || 0
+    };
+    
+    onAdd(finalData as Transaction);
     onClose();
   };
 
   return (
-    <div className="bg-white p-6 border-b border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Nueva Transacción</h3>
+    <div className="bg-[#faf9f6] p-6 border-b border-[#e0d6c8]">
+      <h3 className="text-lg font-semibold text-[#3e3a35] mb-4">Nueva Transacción</h3>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
         
+        {/* Tipo de Movimiento Toggle */}
+        <div className="md:col-span-4 flex space-x-4 mb-2">
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input 
+              type="radio" 
+              name="tipo" 
+              value="INGRESO"
+              checked={tipoMovimiento === 'INGRESO'}
+              onChange={() => {
+                setTipoMovimiento('INGRESO');
+                setFormData(prev => ({ ...prev, Ingresos: prev.Egresos || prev.Ingresos, Egresos: 0 }));
+              }}
+              className="text-[#8b7355] focus:ring-[#8b7355]"
+            />
+            <span className="text-sm font-medium text-[#3e3a35]">Ingreso (Venta)</span>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input 
+              type="radio" 
+              name="tipo" 
+              value="EGRESO"
+              checked={tipoMovimiento === 'EGRESO'}
+              onChange={() => {
+                setTipoMovimiento('EGRESO');
+                setFormData(prev => ({ ...prev, Egresos: prev.Ingresos || prev.Egresos, Ingresos: 0 }));
+              }}
+              className="text-[#8b7355] focus:ring-[#8b7355]"
+            />
+            <span className="text-sm font-medium text-[#3e3a35]">Egreso (Gasto)</span>
+          </label>
+        </div>
+
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
-          <input required type="text" name="Fecha" placeholder="DD/MM/YYYY" value={formData.Fecha || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Fecha</label>
+          <input required type="text" name="Fecha" placeholder="DD/MM/YYYY" value={formData.Fecha || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
         </div>
         
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Prov/Cliente</label>
-          <input type="text" name="Prov/Cliente" value={formData['Prov/Cliente'] || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Prov/Cliente</label>
+          <input type="text" name="Prov/Cliente" value={formData['Prov/Cliente'] || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
         </div>
         
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Cuenta</label>
-          <select name="Cuenta" value={formData.Cuenta || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-            <option value="">Seleccionar...</option>
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Cuenta</label>
+          <select name="Cuenta" value={formData.Cuenta || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors">
             <option value="EFECTIVO">EFECTIVO</option>
             <option value="BANCO">BANCO</option>
             <option value="PENDIENTE">PENDIENTE</option>
@@ -49,43 +100,49 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onClose }) => {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Subactividad</label>
-          <select name="Subactividad" value={formData.Subactividad || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Unidad de Negocio</label>
+          <select name="Subactividad" value={formData.Subactividad || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors">
             <option value="TAMBO">TAMBO</option>
-            <option value="RECRIA">RECRIA</option>
-            <option value="QUESERIA">QUESERIA</option>
-            <option value="COMUN">COMUN</option>
+            <option value="RECRIA">RECRÍA</option>
+            <option value="QUESERIA">QUESERÍA</option>
+            <option value="COMUN">COMÚN</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Rubro</label>
-          <input type="text" name="Rubro" value={formData.Rubro || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Rubro</label>
+          <input type="text" name="Rubro" value={formData.Rubro || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Subrubro/Producto</label>
-          <input type="text" name="Subrubro/Producto" value={formData['Subrubro/Producto'] || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Subrubro/Producto</label>
+          <input type="text" name="Subrubro/Producto" value={formData['Subrubro/Producto'] || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Ingresos</label>
-          <input type="number" step="0.01" name="Ingresos" value={formData.Ingresos || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-emerald-600" />
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Monto ($)</label>
+          <input 
+            type="number" 
+            step="0.01" 
+            value={(tipoMovimiento === 'INGRESO' ? formData.Ingresos : formData.Egresos) || ''} 
+            onChange={handleMontoChange} 
+            className={`w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors font-medium ${tipoMovimiento === 'INGRESO' ? 'text-emerald-600' : 'text-rose-600'}`} 
+          />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Egresos</label>
-          <input type="number" step="0.01" name="Egresos" value={formData.Egresos || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-rose-600" />
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Cantidades</label>
+          <input type="number" step="0.01" name="Cantidades" value={formData.Cantidades || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
         </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Cantidades</label>
-          <input type="number" step="0.01" name="Cantidades" value={formData.Cantidades || ''} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+        
+        <div className="md:col-span-4">
+          <label className="block text-xs font-medium text-[#6b645c] mb-1">Observaciones</label>
+          <input type="text" name="Observaciones" value={formData.Observaciones || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
         </div>
 
         <div className="md:col-span-4 flex justify-end space-x-3 mt-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">Cancelar</button>
-          <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Guardar</button>
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-[#e0d6c8] text-[#6b645c] rounded text-sm hover:bg-[#f4ebd8] font-medium transition-colors">Cancelar</button>
+          <button type="submit" className="px-4 py-2 bg-[#8b7355] text-white rounded text-sm hover:bg-[#7a6448] font-medium shadow-sm transition-colors">Guardar Movimiento</button>
         </div>
       </form>
     </div>

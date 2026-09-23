@@ -14,6 +14,7 @@ export type Transaction = {
   Provoleta?: string | number;
   Ricota?: string | number;
   Cantidades?: string | number;
+  Observaciones?: string;
 };
 
 export const parseCurrency = (val: string | number | undefined): number => {
