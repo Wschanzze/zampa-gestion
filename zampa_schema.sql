@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS zampa_transacciones (
   rubro TEXT,
   subactividad TEXT,
   subrubro_producto TEXT,
+  pecorino NUMERIC DEFAULT 0,
+  manchego NUMERIC DEFAULT 0,
+  saborizado NUMERIC DEFAULT 0,
+  ahumado NUMERIC DEFAULT 0,
+  provoleta NUMERIC DEFAULT 0,
+  ricota NUMERIC DEFAULT 0,
   cantidades NUMERIC DEFAULT 0,
   observaciones TEXT,
   

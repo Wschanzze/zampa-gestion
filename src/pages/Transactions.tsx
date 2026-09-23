@@ -42,7 +42,14 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
               <th className="px-4 py-3">Rubro</th>
               <th className="px-4 py-3">Subactividad</th>
               <th className="px-4 py-3">Subrubro/Prod</th>
+              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Pecorino (kg)">Pecorino</th>
+              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Manchego (kg)">Manchego</th>
+              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Saborizado (kg)">Saboriz.</th>
+              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Ahumado (kg)">Ahumado</th>
+              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Provoleta (kg)">Provol.</th>
+              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Ricota (kg)">Ricota</th>
               <th className="px-4 py-3 text-right">Cantidades</th>
+              <th className="px-4 py-3">Observaciones</th>
             </tr>
           </thead>
           <tbody>
@@ -52,7 +59,7 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
               
               return (
                 <tr key={idx} className="border-b border-[#e0d6c8]/50 hover:bg-[#f4ebd8]/30 transition-colors">
-                  <td className="px-4 py-3 whitespace-nowrap text-[#3e3a35]">{row.Fecha}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-[#3e3a35] font-medium">{row.Fecha}</td>
                   <td className="px-4 py-3 font-medium text-[#3e3a35]">{row['Prov/Cliente']}</td>
                   <td className="px-4 py-3 text-[#6b645c]">{row.Cuenta}</td>
                   <td className="px-4 py-3 text-right font-medium text-emerald-600">{ingresosParsed > 0 ? `$${ingresosParsed.toLocaleString('es-AR')}` : '-'}</td>
@@ -69,13 +76,20 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-[#6b645c]">{row['Subrubro/Producto']}</td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Pecorino ? Number(row.Pecorino).toLocaleString('es-AR') : '-'}</td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Manchego ? Number(row.Manchego).toLocaleString('es-AR') : '-'}</td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Saborizado ? Number(row.Saborizado).toLocaleString('es-AR') : '-'}</td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Ahumado ? Number(row.Ahumado).toLocaleString('es-AR') : '-'}</td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Provoleta ? Number(row.Provoleta).toLocaleString('es-AR') : '-'}</td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Ricota ? Number(row.Ricota).toLocaleString('es-AR') : '-'}</td>
                   <td className="px-4 py-3 text-right font-medium text-[#3e3a35]">{row.Cantidades || '-'}</td>
+                  <td className="px-4 py-3 text-xs text-[#6b645c] max-w-[200px] truncate" title={row.Observaciones}>{row.Observaciones || '-'}</td>
                 </tr>
               );
             })}
             {data.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-[#6b645c]">
+                <td colSpan={16} className="px-4 py-8 text-center text-[#6b645c]">
                   No hay transacciones registradas
                 </td>
               </tr>

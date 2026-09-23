@@ -36,12 +36,20 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onClose }) => {
       ...formData,
       Ingresos: Number(formData.Ingresos) || 0,
       Egresos: Number(formData.Egresos) || 0,
-      Cantidades: Number(formData.Cantidades) || 0
+      Cantidades: Number(formData.Cantidades) || 0,
+      Pecorino: Number(formData.Pecorino) || 0,
+      Manchego: Number(formData.Manchego) || 0,
+      Saborizado: Number(formData.Saborizado) || 0,
+      Ahumado: Number(formData.Ahumado) || 0,
+      Provoleta: Number(formData.Provoleta) || 0,
+      Ricota: Number(formData.Ricota) || 0,
     };
     
     onAdd(finalData as Transaction);
     onClose();
   };
+
+  const isQueseria = formData.Subactividad?.toUpperCase() === 'QUESERIA';
 
   return (
     <div className="bg-[#faf9f6] p-6 border-b border-[#e0d6c8]">
@@ -134,6 +142,35 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onClose }) => {
           <label className="block text-xs font-medium text-[#6b645c] mb-1">Cantidades</label>
           <input type="number" step="0.01" name="Cantidades" value={formData.Cantidades || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
         </div>
+
+        {isQueseria && (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-[#6b645c] mb-1">Pecorino (Kg)</label>
+              <input type="number" step="0.01" name="Pecorino" value={formData.Pecorino || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#6b645c] mb-1">Manchego (Kg)</label>
+              <input type="number" step="0.01" name="Manchego" value={formData.Manchego || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#6b645c] mb-1">Saborizado (Kg)</label>
+              <input type="number" step="0.01" name="Saborizado" value={formData.Saborizado || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#6b645c] mb-1">Ahumado (Kg)</label>
+              <input type="number" step="0.01" name="Ahumado" value={formData.Ahumado || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#6b645c] mb-1">Provoleta (Kg)</label>
+              <input type="number" step="0.01" name="Provoleta" value={formData.Provoleta || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#6b645c] mb-1">Ricota (Kg)</label>
+              <input type="number" step="0.01" name="Ricota" value={formData.Ricota || ''} onChange={handleChange} className="w-full border border-[#e0d6c8] rounded px-3 py-2 text-sm focus:ring-[#8b7355] focus:border-[#8b7355] outline-none transition-colors" />
+            </div>
+          </>
+        )}
         
         <div className="md:col-span-4">
           <label className="block text-xs font-medium text-[#6b645c] mb-1">Observaciones</label>

@@ -4,7 +4,7 @@ import type { Transaction } from '../utils/calculations';
 
 // Map Supabase snake_case columns to our React component's expected fields
 const mapFromSupabase = (row: any): Transaction => ({
-  Fecha: new Date(row.fecha).toLocaleDateString('es-AR'), // Supabase uses YYYY-MM-DD
+  Fecha: new Date(row.fecha + 'T12:00:00Z').toLocaleDateString('es-AR'), // Prevent timezone shift
   'Prov/Cliente': row.prov_cliente,
   Cuenta: row.cuenta,
   Ingresos: row.ingresos,
@@ -12,6 +12,12 @@ const mapFromSupabase = (row: any): Transaction => ({
   Rubro: row.rubro,
   Subactividad: row.subactividad,
   'Subrubro/Producto': row.subrubro_producto,
+  Pecorino: row.pecorino,
+  Manchego: row.manchego,
+  Saborizado: row.saborizado,
+  Ahumado: row.ahumado,
+  Provoleta: row.provoleta,
+  Ricota: row.ricota,
   Cantidades: row.cantidades,
   Observaciones: row.observaciones,
 });
@@ -20,7 +26,7 @@ const mapFromSupabase = (row: any): Transaction => ({
 const mapToSupabase = (tx: Transaction) => {
   // Convert DD/MM/YYYY to YYYY-MM-DD for PG DATE column
   const [day, month, year] = tx.Fecha.split('/');
-  const pgDate = `${year}-${month}-${day}`;
+  const pgDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
   return {
     fecha: pgDate,
@@ -31,6 +37,12 @@ const mapToSupabase = (tx: Transaction) => {
     rubro: tx.Rubro || null,
     subactividad: tx.Subactividad || null,
     subrubro_producto: tx['Subrubro/Producto'] || null,
+    pecorino: tx.Pecorino || 0,
+    manchego: tx.Manchego || 0,
+    saborizado: tx.Saborizado || 0,
+    ahumado: tx.Ahumado || 0,
+    provoleta: tx.Provoleta || 0,
+    ricota: tx.Ricota || 0,
     cantidades: tx.Cantidades || 0,
     observaciones: tx.Observaciones || null,
   };

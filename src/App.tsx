@@ -15,20 +15,26 @@ function App() {
   return (
     <div className="flex h-screen bg-[#faf9f6]">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#f4ebd8] text-[#3e3a35] flex flex-col border-r border-[#e0d6c8] shadow-sm relative z-20">
-        <div className="p-6 flex flex-col items-center">
+      <aside className="w-64 bg-[#f4ebd8] text-[#3e3a35] flex flex-col border-r border-[#e0d6c8] shadow-sm relative z-20 overflow-hidden">
+        {/* Cheese Sidebar Background */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-20 bg-center bg-no-repeat bg-cover z-0 filter blur-[2px]"
+          style={{ backgroundImage: 'url("/IMG_9858.JPG")' }}
+        />
+        
+        <div className="p-6 flex flex-col items-center relative z-10">
           <img src="/logo negro.png" alt="Zampa Gestión" className="w-24 mb-4 opacity-90 mix-blend-multiply" />
           <h1 className="text-xl font-bold text-center">Gestión Tambo</h1>
-          <p className="text-[#6b645c] text-sm mt-1 text-center">Ovino & Quesería</p>
+          <p className="text-[#6b645c] text-sm mt-1 text-center font-medium">Ovino & Quesería</p>
         </div>
         
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 space-y-2 relative z-10">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
               activeTab === 'dashboard' 
-                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#6b645c] hover:bg-[#eae0cd]'
+                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
           >
             <LayoutDashboard size={20} />
@@ -39,8 +45,8 @@ function App() {
             onClick={() => setActiveTab('cashflow')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
               activeTab === 'cashflow' 
-                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#6b645c] hover:bg-[#eae0cd]'
+                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
           >
             <LineChart size={20} />
@@ -51,8 +57,8 @@ function App() {
             onClick={() => setActiveTab('transactions')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
               activeTab === 'transactions' 
-                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#6b645c] hover:bg-[#eae0cd]'
+                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
           >
             <TableProperties size={20} />

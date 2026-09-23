@@ -80,41 +80,81 @@ export const calculatePendientes = (data: Transaction[]) => {
   }));
 };
 
-export const calculateCashFlow = (data: Transaction[]) => {
-  const months = new Set<string>();
+export const getAvailableYears = (data: Transaction[]) => {
+  const years = new Set<string>();
+  data.forEach(row => {
+    const parts = row.Fecha?.split('/');
+    if (parts && parts.length === 3 && parts[2]) {
+      years.add(parts[2].trim());
+    }
+  });
+  if (years.size === 0) {
+    years.add(new Date().getFullYear().toString());
+  }
+  return Array.from(years).sort().reverse();
+};
+
+export const calculateCashFlow = (data: Transaction[], selectedYear?: string) => {
+  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  
   const rubrosIngreso = new Set<string>();
   const rubrosEgreso = new Set<string>();
   
+  // Matrix format: matrix[rubro][monthName] = amount
   const matrix: Record<string, Record<string, number>> = {};
   
   data.forEach(row => {
+    if (!row.Fecha) return;
     const dateParts = row.Fecha.split('/');
     if (dateParts.length !== 3) return; // ignore invalid dates
-    const month = `${dateParts[1]}-${dateParts[2]}`; // MM-YYYY
-    months.add(month);
+    
+    const rowYear = dateParts[2].trim();
+    if (selectedYear && rowYear !== selectedYear) return;
+
+    const monthIndex = parseInt(dateParts[1], 10) - 1;
+    if (monthIndex < 0 || monthIndex > 11) return;
+    
+    const monthName = monthNames[monthIndex];
     
     const ingresos = parseCurrency(row.Ingresos);
     const egresos = parseCurrency(row.Egresos);
     const rubro = row.Rubro || 'Sin Rubro';
     
-    if (!matrix[rubro]) matrix[rubro] = {};
-    if (!matrix[rubro][month]) matrix[rubro][month] = 0;
+    if (!matrix[rubro]) {
+      matrix[rubro] = {};
+      monthNames.forEach(m => matrix[rubro][m] = 0);
+    }
     
     if (ingresos > 0) {
       rubrosIngreso.add(rubro);
-      matrix[rubro][month] += ingresos;
+      matrix[rubro][monthName] += ingresos;
     }
     if (egresos > 0) {
       rubrosEgreso.add(rubro);
-      matrix[rubro][month] += egresos;
+      matrix[rubro][monthName] += egresos;
     }
   });
 
-  const sortedMonths = Array.from(months).sort((a, b) => {
-    const [ma, ya] = a.split('-');
-    const [mb, yb] = b.split('-');
-    return (parseInt(ya) - parseInt(yb)) || (parseInt(ma) - parseInt(mb));
+  // Calculate monthly net and accumulated balance
+  let accum = 0;
+  const saldoMensual: Record<string, number> = {};
+  const saldoAcumulado: Record<string, number> = {};
+
+  monthNames.forEach(m => {
+    const ing = Array.from(rubrosIngreso).reduce((acc, r) => acc + (matrix[r]?.[m] || 0), 0);
+    const egr = Array.from(rubrosEgreso).reduce((acc, r) => acc + (matrix[r]?.[m] || 0), 0);
+    const net = ing - egr;
+    saldoMensual[m] = net;
+    accum += net;
+    saldoAcumulado[m] = accum;
   });
 
-  return { sortedMonths, rubrosIngreso: Array.from(rubrosIngreso), rubrosEgreso: Array.from(rubrosEgreso), matrix };
+  return { 
+    sortedMonths: monthNames, 
+    rubrosIngreso: Array.from(rubrosIngreso), 
+    rubrosEgreso: Array.from(rubrosEgreso), 
+    matrix,
+    saldoMensual,
+    saldoAcumulado
+  };
 };
