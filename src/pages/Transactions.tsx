@@ -1,13 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Transaction } from '../utils/calculations';
+import TransactionForm from '../components/TransactionForm';
+import { Plus } from 'lucide-react';
 
 interface TransactionsProps {
   data: Transaction[];
+  onAdd: (tx: Transaction) => void;
 }
 
-const Transactions: React.FC<TransactionsProps> = ({ data }) => {
+const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
+  const [showForm, setShowForm] = useState(false);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      
+      {/* Header action */}
+      <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+        <h3 className="text-lg font-semibold text-gray-800">Historial de Movimientos</h3>
+        <button 
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center space-x-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition-colors"
+        >
+          <Plus size={16} />
+          <span>Nuevo Movimiento</span>
+        </button>
+      </div>
+
+      {showForm && <TransactionForm onAdd={onAdd} onClose={() => setShowForm(false)} />}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">

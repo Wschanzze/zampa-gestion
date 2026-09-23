@@ -8,9 +8,12 @@ import type { Transaction } from './utils/calculations';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'cashflow'>('dashboard');
-  
-  // Type assertion for the imported JSON data
-  const data = dataJson.baseDeDatos as unknown as Transaction[];
+  const [data, setData] = useState<Transaction[]>(dataJson.baseDeDatos as unknown as Transaction[]);
+
+  const handleAddTransaction = (newTx: Transaction) => {
+    setData([...data, newTx]);
+    // In a real app, this would also push to a backend/Supabase
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -61,7 +64,7 @@ function App() {
         <div className="p-8">
           {activeTab === 'dashboard' && <Dashboard data={data} />}
           {activeTab === 'cashflow' && <CashFlow data={data} />}
-          {activeTab === 'transactions' && <Transactions data={data} />}
+          {activeTab === 'transactions' && <Transactions data={data} onAdd={handleAddTransaction} />}
         </div>
       </main>
     </div>
