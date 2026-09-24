@@ -17,6 +17,7 @@ dist-ssr
 Gestion_Tambo_Ovino.xlsx
 pdf/
 parse.mjs
+Font/
 
 # Editor directories and files
 .vscode/*
