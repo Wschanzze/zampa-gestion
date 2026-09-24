@@ -80,6 +80,25 @@ const TransactionForm: React.FC<Props> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    const cheeseFields = ['Pecorino', 'Manchego', 'Saborizado', 'Ahumado', 'Provoleta', 'Ricota'];
+
+    if (cheeseFields.includes(name)) {
+      const updated = { ...formData, [name]: value };
+      const p = Number(name === 'Pecorino' ? value : updated.Pecorino) || 0;
+      const m = Number(name === 'Manchego' ? value : updated.Manchego) || 0;
+      const s = Number(name === 'Saborizado' ? value : updated.Saborizado) || 0;
+      const a = Number(name === 'Ahumado' ? value : updated.Ahumado) || 0;
+      const pr = Number(name === 'Provoleta' ? value : updated.Provoleta) || 0;
+      const r = Number(name === 'Ricota' ? value : updated.Ricota) || 0;
+      const totalCheese = parseFloat((p + m + s + a + pr + r).toFixed(2));
+
+      setFormData({
+        ...updated,
+        Cantidades: totalCheese > 0 ? totalCheese : updated.Cantidades
+      });
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -103,13 +122,6 @@ const TransactionForm: React.FC<Props> = ({
     return parseFloat((p + m + s + a + pr + r).toFixed(2));
   }, [formData.Pecorino, formData.Manchego, formData.Saborizado, formData.Ahumado, formData.Provoleta, formData.Ricota]);
 
-  // Auto-fill or suggest Cantidades from total cheeses if in Queseria
-  const handleAutoFillCantidades = () => {
-    if (totalKgQuesos > 0) {
-      setFormData(prev => ({ ...prev, Cantidades: totalKgQuesos }));
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.Fecha) {
@@ -117,18 +129,30 @@ const TransactionForm: React.FC<Props> = ({
       return;
     }
 
+    const p = Number(formData.Pecorino) || 0;
+    const m = Number(formData.Manchego) || 0;
+    const s = Number(formData.Saborizado) || 0;
+    const a = Number(formData.Ahumado) || 0;
+    const pr = Number(formData.Provoleta) || 0;
+    const r = Number(formData.Ricota) || 0;
+    const calculatedCheeseTotal = parseFloat((p + m + s + a + pr + r).toFixed(2));
+
+    const finalCantidades = calculatedCheeseTotal > 0 
+      ? calculatedCheeseTotal 
+      : (Number(formData.Cantidades) || 0);
+
     const finalData: Transaction = {
       ...formData,
       Fecha: formData.Fecha,
       Ingresos: tipoMovimiento === 'INGRESO' ? (Number(formData.Ingresos) || 0) : 0,
       Egresos: tipoMovimiento === 'EGRESO' ? (Number(formData.Egresos) || 0) : 0,
-      Cantidades: Number(formData.Cantidades) || 0,
-      Pecorino: Number(formData.Pecorino) || 0,
-      Manchego: Number(formData.Manchego) || 0,
-      Saborizado: Number(formData.Saborizado) || 0,
-      Ahumado: Number(formData.Ahumado) || 0,
-      Provoleta: Number(formData.Provoleta) || 0,
-      Ricota: Number(formData.Ricota) || 0,
+      Cantidades: finalCantidades,
+      Pecorino: p,
+      Manchego: m,
+      Saborizado: s,
+      Ahumado: a,
+      Provoleta: pr,
+      Ricota: r,
     };
 
     if (isEditing && initialData?.id && onUpdate) {
@@ -320,16 +344,13 @@ const TransactionForm: React.FC<Props> = ({
             {/* Cantidades generales */}
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-semibold text-[#6b645c]">Cantidades Totales</label>
+                <label className="text-xs font-semibold text-[#6b645c]">
+                  Cantidades Totales {totalKgQuesos > 0 ? '(Kg Quesos)' : ''}
+                </label>
                 {totalKgQuesos > 0 && (
-                  <button 
-                    type="button" 
-                    onClick={handleAutoFillCantidades}
-                    className="text-[10px] text-amber-800 hover:underline flex items-center gap-0.5"
-                    title="Usar suma de quesos"
-                  >
-                    <Calculator size={11} /> Usar {totalKgQuesos} kg
-                  </button>
+                  <span className="text-[10px] text-amber-900 font-bold bg-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                    <Calculator size={10} /> Suma auto: {totalKgQuesos} kg
+                  </span>
                 )}
               </div>
               <input 
@@ -339,7 +360,9 @@ const TransactionForm: React.FC<Props> = ({
                 placeholder="0.00"
                 value={formData.Cantidades || ''} 
                 onChange={handleChange} 
-                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-medium" 
+                className={`w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-bold ${
+                  totalKgQuesos > 0 ? 'bg-amber-50/40 border-amber-300 text-amber-950' : ''
+                }`} 
               />
             </div>
 
