@@ -12,7 +12,9 @@ import {
   Calendar,
   Layers,
   Snowflake,
-  PackageCheck
+  PackageCheck,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import {
   LineChart,
@@ -30,6 +32,7 @@ import {
 const Produccion = () => {
   const { data, loading, addRecord, deleteRecord } = useProduccion();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expandedStock, setExpandedStock] = useState<string | null>(null);
   
   // Date filters
   const [startDate, setStartDate] = useState('');
@@ -136,7 +139,7 @@ const Produccion = () => {
     data.forEach(row => {
       const elaborationDate = new Date(row.fecha_elaboracion + 'T12:00:00Z');
       const diffTime = today.getTime() - elaborationDate.getTime();
-      const diffDays = Math.max(0, diffTime / (1000 * 60 * 60 * 24));
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
       
       // Merma: 20% a los 60 días -> 0.20 / 60 por día. Cap en 35% de merma max para no desaparecer el queso.
       const mermaPct = Math.min((diffDays / 60) * 0.20, 0.35);
@@ -147,19 +150,33 @@ const Produccion = () => {
       
       if (!map.has(key)) {
         map.set(key, { 
+          id: key,
           producto: row.producto, 
           variedad: tipo, 
           kg_original: 0, 
-          kg_estimado: 0 
+          kg_estimado: 0,
+          lotes: []
         });
       }
       const entry = map.get(key);
       entry.kg_original += Number(row.kg_totales);
       entry.kg_estimado += currentKg;
+      entry.lotes.push({
+        lote: row.lote,
+        fecha: row.fecha_elaboracion,
+        dias: diffDays,
+        mermaPct: mermaPct * 100,
+        kg_original: Number(row.kg_totales),
+        kg_estimado: currentKg
+      });
     });
 
     // Sort by largest estimated stock
-    return Array.from(map.values()).sort((a, b) => b.kg_estimado - a.kg_estimado);
+    return Array.from(map.values()).map(group => {
+      // Sort internal lotes by oldest first
+      group.lotes.sort((a: any, b: any) => b.dias - a.dias);
+      return group;
+    }).sort((a, b) => b.kg_estimado - a.kg_estimado);
   }, [data]);
 
   if (loading) {
@@ -398,32 +415,92 @@ const Produccion = () => {
             Contempla 20% merma a 60 días
           </span>
         </div>
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-gray-50/30">
-          {stockEstimado.map((stock, idx) => (
-            <div key={idx} className="bg-white border border-[#e0d6c8] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start mb-3">
-                <span className={`inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold rounded-md border ${getBadgeColor(stock.producto)}`}>
-                  {stock.producto}
-                </span>
-                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
-                  {stock.variedad}
-                </span>
-              </div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Peso Estimado Actual</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-black text-[#2b2824]">{stock.kg_estimado.toFixed(1)}</span>
-                <span className="text-sm font-medium text-gray-500">Kg</span>
-              </div>
-              <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-medium">Producido</span>
-                <span className="text-xs font-bold text-[#8b7355]">{stock.kg_original.toFixed(1)} Kg</span>
-              </div>
+        <div className="p-5 flex flex-col gap-4 bg-gray-50/30">
+          {stockEstimado.map((stock) => (
+            <div key={stock.id} className="bg-white border border-[#e0d6c8] rounded-xl shadow-sm overflow-hidden">
+               {/* Header / Summary */}
+               <div 
+                 className="p-5 flex flex-col sm:flex-row items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                 onClick={() => setExpandedStock(expandedStock === stock.id ? null : stock.id)}
+               >
+                 <div className="flex items-center gap-4 w-full sm:w-auto">
+                    <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl border bg-white shadow-sm ${getBadgeColor(stock.producto)}`}>
+                      <Snowflake size={24} className="opacity-80" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${getBadgeColor(stock.producto)}`}>
+                          {stock.producto}
+                        </span>
+                        <h4 className="text-lg font-bold text-[#2b2824]">{stock.variedad}</h4>
+                      </div>
+                      <p className="text-sm text-gray-500 font-medium">
+                        {stock.lotes.length} {stock.lotes.length === 1 ? 'lote' : 'lotes'} en cámara
+                      </p>
+                    </div>
+                 </div>
+
+                 <div className="flex items-center justify-between w-full sm:w-auto mt-4 sm:mt-0 gap-6 sm:gap-8">
+                    <div className="text-right">
+                      <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Peso Original</p>
+                      <p className="text-lg font-semibold text-gray-500">{stock.kg_original.toFixed(1)} Kg</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">Stock Estimado</p>
+                      <p className="text-2xl font-black text-[#8b7355]">{stock.kg_estimado.toFixed(1)} Kg</p>
+                    </div>
+                    <div className="text-[#8b7355] bg-[#f4ebd8]/50 p-2 rounded-full">
+                      {expandedStock === stock.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                 </div>
+               </div>
+
+               {/* Breakdown Table */}
+               {expandedStock === stock.id && (
+                 <div className="border-t border-[#e0d6c8] bg-[#fdfcfb] p-4 sm:p-5 overflow-x-auto">
+                    <table className="w-full text-left border-collapse whitespace-nowrap text-sm">
+                      <thead>
+                        <tr className="text-gray-500 border-b border-[#e0d6c8]">
+                          <th className="pb-3 px-2 font-semibold">Lote</th>
+                          <th className="pb-3 px-2 font-semibold">Elaboración</th>
+                          <th className="pb-3 px-2 font-semibold text-right">Tiempo en Cámara</th>
+                          <th className="pb-3 px-2 font-semibold text-right">Merma %</th>
+                          <th className="pb-3 px-2 font-semibold text-right">Kg Iniciales</th>
+                          <th className="pb-3 px-2 font-semibold text-right">Kg Actuales</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {stock.lotes.map((lote: any, i: number) => (
+                          <tr key={lote.lote + '-' + i} className="hover:bg-white transition-colors">
+                            <td className="py-2.5 px-2 font-bold text-[#2b2824]">{lote.lote}</td>
+                            <td className="py-2.5 px-2 text-gray-600 font-medium">
+                              {new Date(lote.fecha + 'T12:00:00Z').toLocaleDateString('es-AR')}
+                            </td>
+                            <td className="py-2.5 px-2 text-right font-medium text-blue-600 bg-blue-50/30">
+                              {lote.dias} días
+                            </td>
+                            <td className="py-2.5 px-2 text-right text-red-500 font-medium bg-red-50/30">
+                              -{lote.mermaPct.toFixed(1)}%
+                            </td>
+                            <td className="py-2.5 px-2 text-right text-gray-500 font-semibold">
+                              {lote.kg_original.toFixed(2)}
+                            </td>
+                            <td className="py-2.5 px-2 text-right font-bold text-[#2b2824]">
+                              {lote.kg_estimado.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                 </div>
+               )}
             </div>
           ))}
           {stockEstimado.length === 0 && (
-            <div className="col-span-full py-8 text-center text-gray-400">
-              <PackageCheck size={32} className="mx-auto mb-2 text-[#e0d6c8]" />
-              <p className="text-sm font-medium">No hay quesos en cámara.</p>
+            <div className="col-span-full py-12 text-center text-gray-400">
+              <PackageCheck size={48} className="mx-auto mb-3 text-[#e0d6c8]" />
+              <p className="text-lg font-medium text-[#6b645c]">No hay quesos en cámara.</p>
+              <p className="text-sm mt-1">Registra elaboraciones para ver el stock teórico.</p>
             </div>
           )}
         </div>
