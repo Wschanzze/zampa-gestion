@@ -213,9 +213,9 @@ const Produccion = () => {
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#2b2824] hover:bg-[#3e3a35] text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow font-medium"
+            className="bg-[#8b7355] hover:bg-[#735f46] text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide uppercase text-sm"
           >
-            <Plus size={20} />
+            <Plus size={18} strokeWidth={3} />
             Registrar Lote
           </button>
         </div>
@@ -740,7 +740,7 @@ const Produccion = () => {
               <button 
                 type="submit" 
                 form="produccion-form"
-                className="px-5 py-2.5 font-medium bg-[#2b2824] text-white rounded-xl hover:bg-[#3e3a35] transition-colors shadow-sm"
+                className="px-6 py-2.5 font-bold uppercase tracking-wide text-sm bg-[#8b7355] text-white rounded-xl hover:bg-[#735f46] transition-all shadow-sm hover:shadow-md"
               >
                 Guardar Registro
               </button>
