@@ -229,15 +229,6 @@ export interface CheeseStock {
   updated_at?: string;
 }
 
-const DEFAULT_CHEESE_STOCK: CheeseStock[] = [
-  { variedad: 'Pecorino', stock_kg: 140, lote_detalle: 'Lote maduración 90 días' },
-  { variedad: 'Manchego', stock_kg: 210, lote_detalle: 'Lote maduración 60 días' },
-  { variedad: 'Saborizado', stock_kg: 75, lote_detalle: 'Hierbas y pimienta' },
-  { variedad: 'Ahumado', stock_kg: 55, lote_detalle: 'Madera de espinillo' },
-  { variedad: 'Provoleta', stock_kg: 90, lote_detalle: 'Envasado al vacío' },
-  { variedad: 'Ricota', stock_kg: 35, lote_detalle: 'Fresco' },
-];
-
 export const useListas = () => {
   const [entidades, setEntidades] = useState<any[]>([]);
   const [rubros, setRubros] = useState<any[]>([]);
@@ -304,13 +295,7 @@ export const useListas = () => {
 };
 
 export const useQueseriaStock = () => {
-  const [stockList, setStockList] = useState<CheeseStock[]>(() => {
-    const saved = localStorage.getItem('zampa_stock_camara');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { }
-    }
-    return DEFAULT_CHEESE_STOCK;
-  });
+  const [stockList, setStockList] = useState<CheeseStock[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchStock = async () => {

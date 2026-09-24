@@ -63,16 +63,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
       </button>
 
       {/* Header / Brand */}
-      <div className="h-16 flex items-center border-b border-[#e0d6c8]/60 px-4 mt-2 relative z-10">
+      <div className={`flex flex-col items-center border-b border-[#e0d6c8]/60 px-4 pt-4 pb-6 relative z-10 transition-all duration-300 ${isCollapsed ? 'pb-4' : ''}`}>
         <img 
           src="/logo negro.png" 
           alt="Zampa" 
-          className={`transition-all duration-300 object-contain mix-blend-multiply opacity-90 ${isCollapsed ? 'w-8 h-8 mx-auto' : 'w-8 h-8 mr-3'}`} 
+          className={`transition-all duration-300 object-contain mix-blend-multiply opacity-90 ${isCollapsed ? 'w-10 h-10' : 'w-20 h-20 mb-3'}`} 
         />
         {!isCollapsed && (
-          <div className="flex flex-col overflow-hidden">
-            <span className="text-sm font-bold text-[#3e3a35] tracking-tight leading-none truncate">ZAMPA GESTIÓN</span>
-            <span className="text-[10px] text-[#8b7355] font-bold tracking-widest uppercase mt-1 truncate">Ovino & Quesería</span>
+          <div className="flex flex-col items-center overflow-hidden text-center">
+            <span className="text-base font-bold text-[#3e3a35] tracking-tight leading-none">ZAMPA GESTIÓN</span>
+            <span className="text-[10px] text-[#8b7355] font-bold tracking-widest uppercase mt-1.5">Ovino & Quesería</span>
           </div>
         )}
       </div>
