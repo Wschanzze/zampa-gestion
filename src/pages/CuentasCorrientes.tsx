@@ -107,59 +107,84 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
     // 2. Create a temporary div element for PDF generation
     const container = document.createElement('div');
     container.innerHTML = `
-      <div style="padding: 40px; font-family: 'Urbanist', sans-serif; position: relative; min-height: 100vh; background-color: #fdfdfc;">
+      <div style="padding: 50px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; position: relative; min-height: 100vh; background-color: #ffffff; color: #333;">
         <!-- Watermark -->
-        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('/ovejas_render.png'); background-position: center; background-repeat: no-repeat; background-size: cover; opacity: 0.06; pointer-events: none; z-index: 0;"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('/ovejas_render.png'); background-position: center; background-repeat: no-repeat; background-size: 80%; opacity: 0.05; pointer-events: none; z-index: 0;"></div>
         
-        <!-- Content -->
         <div style="position: relative; z-index: 1;">
           <!-- Header -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 2px solid #e0d6c8; padding-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 3px solid #8b7355; padding-bottom: 20px;">
             <div>
-              <img src="/logo negro.png" alt="ZAMPA" style="height: 50px; margin-bottom: 10px;" onerror="this.style.display='none'" />
-              <p style="font-size: 12px; color: #6b645c; margin: 0; font-weight: bold;">QUESERÍA ARTESANAL ZAMPA</p>
+              <img src="/logo negro.png" alt="ZAMPA" style="height: 60px; margin-bottom: 10px;" onerror="this.style.display='none'" />
+              <p style="font-size: 11px; color: #666; margin: 0; font-weight: bold; letter-spacing: 1px;">QUESERÍA ARTESANAL ZAMPA</p>
             </div>
             <div style="text-align: right;">
-              <h1 style="font-size: 24px; color: #2b2824; margin: 0 0 5px 0; font-weight: 900;">ESTADO DE CUENTA</h1>
-              <p style="font-size: 16px; font-weight: bold; color: #8b7355; margin: 0; text-transform: uppercase;">${entityName}</p>
-              <p style="font-size: 12px; color: #6b645c; margin: 5px 0 0 0;">Fecha de emisión: ${new Date().toLocaleDateString('es-AR')}</p>
+              <h1 style="font-size: 26px; color: #8b7355; margin: 0 0 8px 0; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase;">
+                ${entitySaldo > 0 ? 'COMPROBANTE A PAGAR' : entitySaldo < 0 ? 'ESTADO DE CUENTA (A FAVOR)' : 'ESTADO DE CUENTA'}
+              </h1>
+              <p style="font-size: 14px; color: #444; margin: 0;"><strong>CLIENTE/PROV:</strong> ${entityName.toUpperCase()}</p>
+              <p style="font-size: 12px; color: #888; margin: 5px 0 0 0;">Fecha Emisión: ${new Date().toLocaleDateString('es-AR')}</p>
             </div>
           </div>
 
-          <!-- Summary -->
-          <div style="background-color: #f4ebd8; padding: 15px 20px; border-radius: 8px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e0d6c8;">
-            <span style="font-size: 14px; font-weight: bold; color: #3e3a35; text-transform: uppercase;">Saldo Actual Pendiente:</span>
-            <span style="font-size: 20px; font-weight: 900; color: ${entitySaldo > 0 ? '#059669' : entitySaldo < 0 ? '#e11d48' : '#3e3a35'};">
-              ${entitySaldo > 0 ? 'A Cobrar: ' : entitySaldo < 0 ? 'A Pagar: ' : ''}${formatCurrency(Math.abs(entitySaldo))}
-            </span>
+          <!-- Outstanding Balance Huge Block -->
+          <div style="background-color: ${entitySaldo > 0 ? '#f0fdf4' : entitySaldo < 0 ? '#fff1f2' : '#f9fafb'}; border: 1px solid ${entitySaldo > 0 ? '#bbf7d0' : entitySaldo < 0 ? '#fecdd3' : '#e5e7eb'}; padding: 25px 30px; border-radius: 12px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div>
+              <p style="font-size: 13px; font-weight: 700; color: #666; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">
+                ${entitySaldo > 0 ? 'TOTAL A PAGAR (Saldo Pendiente)' : entitySaldo < 0 ? 'SALDO A FAVOR SUYO' : 'Cuenta Saldada ($0)'}
+              </p>
+              <p style="font-size: 12px; color: #888; margin: 0;">${entitySaldo > 0 ? 'Por favor, regularice su saldo pendiente a la brevedad.' : 'Sus pagos han superado o cubierto los cargos.'}</p>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 32px; font-weight: 900; color: ${entitySaldo > 0 ? '#059669' : entitySaldo < 0 ? '#e11d48' : '#374151'};">
+                ${formatCurrency(Math.abs(entitySaldo))}
+              </span>
+            </div>
           </div>
 
-          <!-- Table -->
-          <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+          <!-- Table of Details -->
+          <h3 style="font-size: 14px; color: #333; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px;">DETALLE DE MOVIMIENTOS</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; margin-bottom: 30px;">
             <thead>
-              <tr style="background-color: #f4ebd8; color: #8b7355; border-bottom: 2px solid #e0d6c8;">
-                <th style="padding: 10px; font-weight: bold; text-transform: uppercase;">Fecha</th>
-                <th style="padding: 10px; font-weight: bold; text-transform: uppercase;">Concepto</th>
-                <th style="padding: 10px; font-weight: bold; text-transform: uppercase; text-align: right;">Ingreso</th>
-                <th style="padding: 10px; font-weight: bold; text-transform: uppercase; text-align: right;">Egreso</th>
-                <th style="padding: 10px; font-weight: bold; text-transform: uppercase;">Observaciones</th>
+              <tr style="background-color: #fafafa; border-bottom: 2px solid #ddd;">
+                <th style="padding: 12px 8px; font-weight: 700; color: #555;">FECHA</th>
+                <th style="padding: 12px 8px; font-weight: 700; color: #555;">DETALLE / CONCEPTO</th>
+                <th style="padding: 12px 8px; font-weight: 700; color: #555; text-align: right;">CARGOS ($)</th>
+                <th style="padding: 12px 8px; font-weight: 700; color: #555; text-align: right;">PAGOS / ABONOS ($)</th>
               </tr>
             </thead>
             <tbody>
-              ${history.map((h) => `
-                <tr style="border-bottom: 1px solid #e0d6c8;">
-                  <td style="padding: 10px; color: #3e3a35; font-weight: 500;">${h.Fecha || '-'}</td>
-                  <td style="padding: 10px; font-weight: bold; color: #3e3a35;">${h.Rubro} ${h['Subrubro/Producto'] ? `(${h['Subrubro/Producto']})` : ''}</td>
-                  <td style="padding: 10px; text-align: right; font-weight: bold; color: #059669;">${parseCurrency(h.Ingresos) > 0 ? formatCurrency(parseCurrency(h.Ingresos)) : '-'}</td>
-                  <td style="padding: 10px; text-align: right; font-weight: bold; color: #e11d48;">${parseCurrency(h.Egresos) > 0 ? formatCurrency(parseCurrency(h.Egresos)) : '-'}</td>
-                  <td style="padding: 10px; color: #6b645c;">${h.Observaciones || '-'}</td>
+              ${history.map((h) => {
+                 const cargo = parseCurrency(h.Ingresos);
+                 const pago = parseCurrency(h.Egresos);
+                 return \`
+                <tr style="border-bottom: 1px solid #f0f0f0;">
+                  <td style="padding: 12px 8px; color: #555; white-space: nowrap;">\${h.Fecha || '-'}</td>
+                  <td style="padding: 12px 8px; color: #333;">
+                    <strong>\${h.Rubro || ''}</strong> \${h['Subrubro/Producto'] ? \` - \${h['Subrubro/Producto']}\` : ''}
+                    \${h.Observaciones ? \`<br><span style="color: #888; font-size: 11px;">\${h.Observaciones}</span>\` : ''}
+                  </td>
+                  <td style="padding: 12px 8px; text-align: right; color: #333;">\${cargo > 0 ? formatCurrency(cargo) : '-'}</td>
+                  <td style="padding: 12px 8px; text-align: right; color: #333;">\${pago > 0 ? formatCurrency(pago) : '-'}</td>
                 </tr>
-              `).join('')}
+              \`}).join('')}
             </tbody>
+            <tfoot>
+              <tr style="background-color: #fafafa; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
+                <td colspan="2" style="padding: 12px 8px; font-weight: bold; text-align: right; color: #555;">SUMA TOTAL:</td>
+                <td style="padding: 12px 8px; font-weight: bold; text-align: right; color: #333;">
+                  ${formatCurrency(history.reduce((acc, h) => acc + parseCurrency(h.Ingresos), 0))}
+                </td>
+                <td style="padding: 12px 8px; font-weight: bold; text-align: right; color: #333;">
+                  ${formatCurrency(history.reduce((acc, h) => acc + parseCurrency(h.Egresos), 0))}
+                </td>
+              </tr>
+            </tfoot>
           </table>
           
-          <div style="margin-top: 40px; text-align: center; color: #6b645c; font-size: 10px; border-top: 1px solid #e0d6c8; padding-top: 15px;">
-            Documento generado automáticamente desde la plataforma de gestión Zampa.
+          <div style="margin-top: 60px; text-align: center; color: #999; font-size: 11px; border-top: 1px solid #eee; padding-top: 20px;">
+            <p style="margin: 0 0 5px 0;"><strong>DOCUMENTO INTERNO / NO VÁLIDO COMO FACTURA LEGAL</strong></p>
+            <p style="margin: 0;">Quesería Artesanal Zampa - Comprobante generado automáticamente.</p>
           </div>
         </div>
       </div>
