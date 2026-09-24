@@ -86,11 +86,11 @@ const CashFlow: React.FC<CashFlowProps> = ({ data }) => {
       {/* Main Cash Flow Table */}
       <div className="bg-white rounded-xl shadow-md border border-[#e0d6c8] overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
-            <thead className="text-[11px] sm:text-xs text-[#6b645c] bg-[#f4ebd8]/50 border-b-2 border-[#e0d6c8]">
+          <table className="w-full text-xs sm:text-sm text-left border-separate border-spacing-0 whitespace-nowrap">
+            <thead className="text-[11px] sm:text-xs text-[#6b645c] bg-[#f4ebd8] border-b-2 border-[#e0d6c8]">
               <tr>
                 {/* Sticky Concept Column */}
-                <th className="sticky left-0 bg-[#fdfdfc] z-20 px-4 py-3 min-w-[160px] sm:min-w-[200px] font-bold text-[#3e3a35] border-r border-[#e0d6c8] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
+                <th className="sticky left-0 bg-[#f4ebd8] z-20 px-4 py-3 min-w-[160px] sm:min-w-[200px] font-bold text-[#3e3a35] border-r border-[#e0d6c8] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
                   RUBRO / MES
                 </th>
                 {sortedMonths.map(m => (
@@ -103,21 +103,22 @@ const CashFlow: React.FC<CashFlowProps> = ({ data }) => {
             </thead>
             <tbody>
               {/* INGRESOS SECTION */}
-              <tr className="bg-emerald-50/80 border-b border-emerald-200">
-                <td colSpan={sortedMonths.length + 2} className="px-4 py-2.5 font-black text-emerald-900 tracking-widest text-xs sm:text-sm uppercase">
+              <tr className="bg-emerald-50 border-b border-emerald-200">
+                <td className="sticky left-0 bg-[#ecfdf5] z-10 px-4 py-2.5 font-black text-emerald-900 tracking-widest text-xs sm:text-sm uppercase border-r border-emerald-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
                   ▲ INGRESOS
                 </td>
+                <td colSpan={sortedMonths.length + 1} className="bg-emerald-50"></td>
               </tr>
               {rubrosIngreso.length === 0 ? (
                 <tr>
-                  <td colSpan={sortedMonths.length + 2} className="px-4 py-4 text-center text-[#6b645c] italic">
+                  <td className="sticky left-0 bg-white z-10 border-r border-[#e0d6c8]/60"></td>
+                  <td colSpan={sortedMonths.length + 1} className="px-4 py-4 text-center text-[#6b645c] italic">
                     Sin ingresos registrados para el año {selectedYear}
                   </td>
                 </tr>
               ) : (
                 rubrosIngreso.map(rubro => (
                   <tr key={rubro} className="bg-white border-b border-[#e0d6c8]/50 hover:bg-emerald-50/40 transition-colors">
-                    {/* Sticky row name */}
                     <td className="sticky left-0 bg-white z-10 px-4 py-2.5 text-[#4a443c] font-semibold border-r border-[#e0d6c8]/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] max-w-[180px] sm:max-w-none overflow-hidden text-ellipsis" title={rubro}>
                       {rubro}
                     </td>
@@ -145,24 +146,28 @@ const CashFlow: React.FC<CashFlowProps> = ({ data }) => {
               </tr>
 
               {/* SPACER */}
-              <tr className="bg-[#faf9f6]"><td colSpan={sortedMonths.length + 2} className="py-2 border-y border-[#e0d6c8]/30"></td></tr>
+              <tr className="bg-[#faf9f6]">
+                <td className="sticky left-0 bg-[#faf9f6] z-10 py-2 border-r border-[#e0d6c8]/60 border-y border-[#e0d6c8]/30"></td>
+                <td colSpan={sortedMonths.length + 1} className="py-2 border-y border-[#e0d6c8]/30"></td>
+              </tr>
 
               {/* EGRESOS SECTION */}
-              <tr className="bg-rose-50/80 border-b border-rose-200">
-                <td colSpan={sortedMonths.length + 2} className="px-4 py-2.5 font-black text-rose-900 tracking-widest text-xs sm:text-sm uppercase">
+              <tr className="bg-rose-50 border-b border-rose-200">
+                <td className="sticky left-0 bg-[#fff1f2] z-10 px-4 py-2.5 font-black text-rose-900 tracking-widest text-xs sm:text-sm uppercase border-r border-rose-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
                   ▼ EGRESOS
                 </td>
+                <td colSpan={sortedMonths.length + 1} className="bg-rose-50"></td>
               </tr>
               {rubrosEgreso.length === 0 ? (
                 <tr>
-                  <td colSpan={sortedMonths.length + 2} className="px-4 py-4 text-center text-[#6b645c] italic">
+                  <td className="sticky left-0 bg-white z-10 border-r border-[#e0d6c8]/60"></td>
+                  <td colSpan={sortedMonths.length + 1} className="px-4 py-4 text-center text-[#6b645c] italic">
                     Sin egresos registrados para el año {selectedYear}
                   </td>
                 </tr>
               ) : (
                 rubrosEgreso.map(rubro => (
                   <tr key={rubro} className="bg-white border-b border-[#e0d6c8]/50 hover:bg-rose-50/40 transition-colors">
-                    {/* Sticky row name */}
                     <td className="sticky left-0 bg-white z-10 px-4 py-2.5 text-[#4a443c] font-semibold border-r border-[#e0d6c8]/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] max-w-[180px] sm:max-w-none overflow-hidden text-ellipsis" title={rubro}>
                       {rubro}
                     </td>
@@ -190,7 +195,10 @@ const CashFlow: React.FC<CashFlowProps> = ({ data }) => {
               </tr>
 
               {/* SPACER */}
-              <tr className="bg-[#faf9f6]"><td colSpan={sortedMonths.length + 2} className="py-2 border-y border-[#e0d6c8]/30"></td></tr>
+              <tr className="bg-[#faf9f6]">
+                <td className="sticky left-0 bg-[#faf9f6] z-10 py-2 border-r border-[#e0d6c8]/60 border-y border-[#e0d6c8]/30"></td>
+                <td colSpan={sortedMonths.length + 1} className="py-2 border-y border-[#e0d6c8]/30"></td>
+              </tr>
 
               {/* SALDO MENSUAL NETO */}
               <tr className="bg-[#f4ebd8] border-t border-b border-[#e0d6c8]">
