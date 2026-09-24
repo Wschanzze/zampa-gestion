@@ -8,6 +8,7 @@ import CashFlow from './pages/CashFlow';
 import CuentasCorrientes from './pages/CuentasCorrientes';
 import Queseria from './pages/Queseria';
 import Produccion from './pages/Produccion';
+import CargaOperario from './pages/CargaOperario';
 import Listas from './pages/Listas';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
@@ -57,8 +58,18 @@ function App() {
     );
   }
 
-  if (!session) {
+  const isCargaDiaria = location.pathname === '/carga-diaria';
+
+  if (!session && !isCargaDiaria) {
     return <Login />;
+  }
+
+  if (isCargaDiaria) {
+    return (
+      <Routes>
+        <Route path="/carga-diaria" element={<CargaOperario />} />
+      </Routes>
+    );
   }
 
   const handleMobileNav = (path: string) => {
