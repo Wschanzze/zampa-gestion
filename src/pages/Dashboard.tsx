@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { calculateSummaryByUnit, getAvailableYears, parseCurrency } from '../utils/calculations';
+import { calculateSummaryByUnit, getAvailableYears } from '../utils/calculations';
 import type { Transaction } from '../utils/calculations';
 import { 
   TrendingUp, 
@@ -7,7 +7,6 @@ import {
   DollarSign, 
   Package, 
   PieChart as PieIcon, 
-  Users, 
   ArrowUpRight, 
   Layers, 
   Calendar,
@@ -71,49 +70,6 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
     }, 0);
   }, [filteredData]);
 
-  // Top 5 Expenses by Rubro
-  const topExpenses = useMemo(() => {
-    const map: Record<string, number> = {};
-    filteredData.forEach(row => {
-      const egreso = parseCurrency(row.Egresos);
-      if (egreso > 0) {
-        const rubro = row.Rubro?.trim() || 'Sin Rubro';
-        map[rubro] = (map[rubro] || 0) + egreso;
-      }
-    });
-
-    const total = Object.values(map).reduce((a, b) => a + b, 0);
-    return Object.entries(map)
-      .map(([rubro, amount]) => ({
-        rubro,
-        amount,
-        pct: total > 0 ? (amount / total) * 100 : 0
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5);
-  }, [filteredData]);
-
-  // Top 5 Clients by Revenue
-  const topClients = useMemo(() => {
-    const map: Record<string, number> = {};
-    filteredData.forEach(row => {
-      const ingreso = parseCurrency(row.Ingresos);
-      if (ingreso > 0) {
-        const client = row['Prov/Cliente']?.trim() || 'Ventas Generales / Mostrador';
-        map[client] = (map[client] || 0) + ingreso;
-      }
-    });
-
-    const total = Object.values(map).reduce((a, b) => a + b, 0);
-    return Object.entries(map)
-      .map(([client, amount]) => ({
-        client,
-        amount,
-        pct: total > 0 ? (amount / total) * 100 : 0
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5);
-  }, [filteredData]);
 
   // Chart data for Unit Comparison
   const unitChartData = useMemo(() => {
@@ -349,102 +305,6 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
 
       </div>
 
-      {/* Analytics Section: Top Expenses & Top Clients (Replacing old Pendientes table) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Top 5 Rubros de Mayor Costo */}
-        <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] p-4 sm:p-5">
-          <div className="flex items-center justify-between border-b border-[#e0d6c8]/60 pb-3 mb-4">
-            <div className="flex items-center space-x-2">
-              <TrendingDown size={18} className="text-rose-700" />
-              <div>
-                <h4 className="text-sm sm:text-base font-bold text-[#2b2824]">Principales Rubros de Gasto</h4>
-                <p className="text-xs text-[#6b645c]">Mayor concentración de costos operativos</p>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-rose-700 font-mono">
-              {formatCurrency(topExpenses.reduce((a, b) => a + b.amount, 0))}
-            </span>
-          </div>
-
-          <div className="space-y-3.5">
-            {topExpenses.map((item, idx) => (
-              <div key={item.rubro} className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-[#2b2824] flex items-center space-x-1.5">
-                    <span className="w-4 h-4 rounded-full bg-[#f4ebd8] text-[#8b7355] text-[10px] flex items-center justify-center font-bold">
-                      {idx + 1}
-                    </span>
-                    <span className="truncate max-w-[200px] sm:max-w-[260px]">{item.rubro}</span>
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-mono font-bold text-rose-700">{formatCurrency(item.amount)}</span>
-                    <span className="text-[10px] text-[#6b645c] w-9 text-right font-semibold">({item.pct.toFixed(0)}%)</span>
-                  </div>
-                </div>
-                {/* Progress Bar */}
-                <div className="w-full bg-[#f4ebd8]/70 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-rose-600 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(item.pct, 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-
-            {topExpenses.length === 0 && (
-              <p className="text-xs text-center text-[#6b645c] py-6">No hay registros de gastos en este período.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Top 5 Clientes / Compradores */}
-        <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] p-4 sm:p-5">
-          <div className="flex items-center justify-between border-b border-[#e0d6c8]/60 pb-3 mb-4">
-            <div className="flex items-center space-x-2">
-              <Users size={18} className="text-emerald-700" />
-              <div>
-                <h4 className="text-sm sm:text-base font-bold text-[#2b2824]">Mayores Clientes y Ventas</h4>
-                <p className="text-xs text-[#6b645c]">Principales generadores de ingresos comerciales</p>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-emerald-700 font-mono">
-              {formatCurrency(topClients.reduce((a, b) => a + b.amount, 0))}
-            </span>
-          </div>
-
-          <div className="space-y-3.5">
-            {topClients.map((item, idx) => (
-              <div key={item.client} className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-[#2b2824] flex items-center space-x-1.5">
-                    <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-800 text-[10px] flex items-center justify-center font-bold">
-                      {idx + 1}
-                    </span>
-                    <span className="truncate max-w-[200px] sm:max-w-[260px]">{item.client}</span>
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-mono font-bold text-emerald-700">{formatCurrency(item.amount)}</span>
-                    <span className="text-[10px] text-[#6b645c] w-9 text-right font-semibold">({item.pct.toFixed(0)}%)</span>
-                  </div>
-                </div>
-                {/* Progress Bar */}
-                <div className="w-full bg-[#f4ebd8]/70 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-emerald-600 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(item.pct, 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-
-            {topClients.length === 0 && (
-              <p className="text-xs text-center text-[#6b645c] py-6">No hay registros de ventas en este período.</p>
-            )}
-          </div>
-        </div>
-
-      </div>
 
       {/* Quick Action Navigation Strip for Cuentas Corrientes */}
       <div className="bg-gradient-to-r from-[#f4ebd8]/80 via-white to-[#f4ebd8]/80 p-4 rounded-xl border border-[#e0d6c8] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
