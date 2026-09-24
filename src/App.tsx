@@ -1,15 +1,18 @@
 import { useState } from 'react';
 // @ts-ignore
-import { LayoutDashboard, TableProperties, LineChart, WalletCards, Menu, X } from 'lucide-react';
+import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import CashFlow from './pages/CashFlow';
 import CuentasCorrientes from './pages/CuentasCorrientes';
+import Queseria from './pages/Queseria';
 
 import { useSupabaseTransactions } from './lib/api';
 
+type TabType = 'dashboard' | 'queseria' | 'cuentas-corrientes' | 'cashflow' | 'transactions';
+
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'cashflow' | 'cuentas-corrientes'>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const { 
@@ -21,7 +24,7 @@ function App() {
     registerPayment 
   } = useSupabaseTransactions();
 
-  const handleTabChange = (tab: 'dashboard' | 'transactions' | 'cashflow' | 'cuentas-corrientes') => {
+  const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
   };
@@ -48,6 +51,7 @@ function App() {
 
         <span className="text-[11px] font-bold px-2 py-0.5 bg-white/90 rounded-full text-[#8b7355] border border-[#e0d6c8]">
           {activeTab === 'dashboard' && 'Dashboard'}
+          {activeTab === 'queseria' && 'Quesería'}
           {activeTab === 'cuentas-corrientes' && 'Ctas. Ctes.'}
           {activeTab === 'cashflow' && 'Flujo Caja'}
           {activeTab === 'transactions' && 'Base Datos'}
@@ -99,6 +103,18 @@ function App() {
           >
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('queseria')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
+              activeTab === 'queseria' 
+                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
+                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
+            }`}
+          >
+            <PackageCheck size={20} />
+            <span>Quesería</span>
           </button>
           
           <button
@@ -165,6 +181,18 @@ function App() {
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('queseria')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
+              activeTab === 'queseria' 
+                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
+            }`}
+          >
+            <PackageCheck size={20} />
+            <span>Quesería</span>
+          </button>
           
           <button
             onClick={() => setActiveTab('cuentas-corrientes')}
@@ -217,6 +245,7 @@ function App() {
           <header className="bg-white/80 backdrop-blur-sm border-b border-[#e0d6c8] px-4 sm:px-6 md:px-8 py-3.5 shadow-xs sticky top-0 z-20 flex items-center justify-between">
             <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#3e3a35] truncate">
               {activeTab === 'dashboard' && 'Resumen por Unidad de Negocio'}
+              {activeTab === 'queseria' && 'Gestión de Quesería & Control de Cámara'}
               {activeTab === 'cuentas-corrientes' && 'Cuentas Corrientes y Saldos'}
               {activeTab === 'cashflow' && 'Flujo de Caja Mensual'}
               {activeTab === 'transactions' && 'Movimientos (Base de Datos)'}
@@ -241,6 +270,7 @@ function App() {
                     onNavigateToCuentas={() => setActiveTab('cuentas-corrientes')} 
                   />
                 )}
+                {activeTab === 'queseria' && <Queseria data={data} />}
                 {activeTab === 'cuentas-corrientes' && (
                   <CuentasCorrientes 
                     data={data} 
@@ -263,45 +293,55 @@ function App() {
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#e0d6c8] z-30 flex items-center justify-around py-1.5 px-2 shadow-lg">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#e0d6c8] z-30 flex items-center justify-around py-1.5 px-1 shadow-lg">
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
             activeTab === 'dashboard' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <LayoutDashboard size={18} />
-          <span className="text-[10px] mt-0.5">Dashboard</span>
+          <span className="text-[9px] mt-0.5 font-medium">Dashboard</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('queseria')}
+          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
+            activeTab === 'queseria' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
+          }`}
+        >
+          <PackageCheck size={18} />
+          <span className="text-[9px] mt-0.5 font-medium">Quesería</span>
         </button>
 
         <button
           onClick={() => setActiveTab('cuentas-corrientes')}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
             activeTab === 'cuentas-corrientes' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <WalletCards size={18} />
-          <span className="text-[10px] mt-0.5">Ctas. Ctes.</span>
+          <span className="text-[9px] mt-0.5 font-medium">Ctas. Ctes.</span>
         </button>
 
         <button
           onClick={() => setActiveTab('cashflow')}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
             activeTab === 'cashflow' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <LineChart size={18} />
-          <span className="text-[10px] mt-0.5">Flujo Caja</span>
+          <span className="text-[9px] mt-0.5 font-medium">Flujo Caja</span>
         </button>
 
         <button
           onClick={() => setActiveTab('transactions')}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
             activeTab === 'transactions' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <TableProperties size={18} />
-          <span className="text-[10px] mt-0.5">Base Datos</span>
+          <span className="text-[9px] mt-0.5 font-medium">Base Datos</span>
         </button>
       </nav>
 
