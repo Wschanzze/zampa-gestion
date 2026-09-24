@@ -157,17 +157,17 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
               ${history.map((h) => {
                  const cargo = parseCurrency(h.Ingresos);
                  const pago = parseCurrency(h.Egresos);
-                 return \`
+                 return `
                 <tr style="border-bottom: 1px solid #f0f0f0;">
-                  <td style="padding: 12px 8px; color: #555; white-space: nowrap;">\${h.Fecha || '-'}</td>
+                  <td style="padding: 12px 8px; color: #555; white-space: nowrap;">${h.Fecha || '-'}</td>
                   <td style="padding: 12px 8px; color: #333;">
-                    <strong>\${h.Rubro || ''}</strong> \${h['Subrubro/Producto'] ? \` - \${h['Subrubro/Producto']}\` : ''}
-                    \${h.Observaciones ? \`<br><span style="color: #888; font-size: 11px;">\${h.Observaciones}</span>\` : ''}
+                    <strong>${h.Rubro || ''}</strong> ${h['Subrubro/Producto'] ? ` - ${h['Subrubro/Producto']}` : ''}
+                    ${h.Observaciones ? `<br><span style="color: #888; font-size: 11px;">${h.Observaciones}</span>` : ''}
                   </td>
-                  <td style="padding: 12px 8px; text-align: right; color: #333;">\${cargo > 0 ? formatCurrency(cargo) : '-'}</td>
-                  <td style="padding: 12px 8px; text-align: right; color: #333;">\${pago > 0 ? formatCurrency(pago) : '-'}</td>
+                  <td style="padding: 12px 8px; text-align: right; color: #333;">${cargo > 0 ? formatCurrency(cargo) : '-'}</td>
+                  <td style="padding: 12px 8px; text-align: right; color: #333;">${pago > 0 ? formatCurrency(pago) : '-'}</td>
                 </tr>
-              \`}).join('')}
+              `}).join('')}
             </tbody>
             <tfoot>
               <tr style="background-color: #fafafa; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
