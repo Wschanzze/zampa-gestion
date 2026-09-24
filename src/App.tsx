@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // @ts-ignore
 import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
@@ -7,14 +7,47 @@ import CashFlow from './pages/CashFlow';
 import CuentasCorrientes from './pages/CuentasCorrientes';
 import Queseria from './pages/Queseria';
 import Listas from './pages/Listas';
+import Login from './components/Login';
+import Sidebar from './components/Sidebar';
 
 import { useSupabaseTransactions } from './lib/api';
+import { supabase } from './lib/supabase';
 
-type TabType = 'dashboard' | 'queseria' | 'cuentas-corrientes' | 'cashflow' | 'transactions' | 'listas';
+export type TabType = 'dashboard' | 'queseria' | 'cuentas-corrientes' | 'cashflow' | 'transactions' | 'listas';
 
 function App() {
+  const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#fdfdfc] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-[#8b7355] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Login />;
+  }
   
   const { 
     data, 
@@ -170,96 +203,13 @@ function App() {
         </nav>
       </aside>
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 bg-[#f4ebd8] text-[#3e3a35] flex-col border-r border-[#e0d6c8] shadow-sm relative z-20 flex-shrink-0 overflow-hidden">
-        {/* Cheese Sidebar Background */}
-        <div 
-          className="absolute inset-0 pointer-events-none opacity-20 bg-center bg-no-repeat bg-cover z-0 filter blur-[2px]"
-          style={{ backgroundImage: 'url("/IMG_9858.JPG")' }}
-        />
-        
-        <div className="p-6 flex flex-col items-center relative z-10">
-          <img src="/logo negro.png" alt="Zampa Gestión" className="w-24 mb-4 opacity-90 mix-blend-multiply" />
-          <h1 className="text-xl font-bold text-center">Gestión Tambo</h1>
-          <p className="text-[#6b645c] text-sm mt-1 text-center font-medium">Ovino & Quesería</p>
-        </div>
-        
-        <nav className="flex-1 px-4 space-y-2 relative z-10">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
-              activeTab === 'dashboard' 
-                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
-            }`}
-          >
-            <LayoutDashboard size={20} />
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('queseria')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
-              activeTab === 'queseria' 
-                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
-            }`}
-          >
-            <PackageCheck size={20} />
-            <span>Quesería</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('cuentas-corrientes')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
-              activeTab === 'cuentas-corrientes' 
-                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
-            }`}
-          >
-            <WalletCards size={20} />
-            <span>Cuentas Corrientes</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('cashflow')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
-              activeTab === 'cashflow' 
-                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
-            }`}
-          >
-            <LineChart size={20} />
-            <span>Flujo de Caja</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('transactions')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
-              activeTab === 'transactions' 
-                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
-            }`}
-          >
-            <TableProperties size={20} />
-            <span>Base de Datos</span>
-          </button>
-
-          <div className="pt-4 mt-4 border-t border-[#e0d6c8]/50">
-            <button
-              onClick={() => setActiveTab('listas')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
-                activeTab === 'listas' 
-                  ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-                  : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
-              }`}
-            >
-              <ListTodo size={20} />
-              <span>Listas y Parámetros</span>
-            </button>
-          </div>
-        </nav>
-      </aside>
+      {/* Desktop Sidebar Component */}
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isCollapsed={isSidebarCollapsed} 
+        setIsCollapsed={setIsSidebarCollapsed} 
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto relative bg-[#fdfdfc] flex flex-col h-full">
