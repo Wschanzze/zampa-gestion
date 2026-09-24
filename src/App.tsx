@@ -255,7 +255,7 @@ function App() {
       <main className="flex-1 overflow-y-auto relative bg-[#fdfdfc] flex flex-col h-full">
         {/* Watermark Background */}
         <div 
-          className="absolute inset-0 pointer-events-none opacity-[0.02] bg-center bg-no-repeat bg-cover z-0"
+          className="absolute inset-0 pointer-events-none opacity-[0.08] bg-center bg-no-repeat bg-cover z-0"
           style={{ backgroundImage: 'url("/ovejas_render.png")' }}
         />
         
