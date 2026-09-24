@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { Transaction } from '../utils/calculations';
 import { calculateCheeseSales, getAvailableYears } from '../utils/calculations';
-import { useQueseriaStock, type CheeseStock } from '../lib/api';
+import { useProduccion } from '../lib/api';
 // @ts-ignore
 import { Sparkles, Layers, ArrowUpRight, Plus, Pencil, X, Check, BarChart3, PackageCheck, AlertCircle } from 'lucide-react';
 // @ts-ignore
@@ -27,35 +27,54 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
   const availableYears = getAvailableYears(data);
   const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || new Date().getFullYear().toString());
 
-  const { stockList, updateStock } = useQueseriaStock();
-
-  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
-  const [editingStockItem, setEditingStockItem] = useState<{ variedad: string; stock_kg: number; lote?: string } | null>(null);
+  const { data: produccionData } = useProduccion();
 
   const { monthNames, variedades, monthlyData, chartData, totals } = calculateCheeseSales(data, selectedYear);
+  const { totals: allTimeSales } = React.useMemo(() => calculateCheeseSales(data), [data]);
+
+  // Dynamic calculation for chamber inventory
+  const stockEstimado = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+
+    const stockMap: Record<string, { variedad: string; producido: number; merma: number; estimado: number; vendido: number; disponible: number }> = {};
+    
+    variedades.forEach(v => {
+      stockMap[v.toLowerCase()] = { variedad: v, producido: 0, merma: 0, estimado: 0, vendido: allTimeSales[v] || 0, disponible: 0 };
+    });
+
+    produccionData.forEach(row => {
+      const tipo = (row.tipo_queso || '').trim().toLowerCase();
+      // Match type directly or if it contains a known variety
+      const match = variedades.find(v => tipo.includes(v.toLowerCase()) || v.toLowerCase() === tipo);
+      
+      if (match) {
+        const key = match.toLowerCase();
+        const elaborationDate = new Date(row.fecha_elaboracion + 'T12:00:00Z');
+        const diffTime = today.getTime() - elaborationDate.getTime();
+        const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+        const mermaPct = Math.min((diffDays / 60) * 0.20, 0.35); // Max 35% shrinkage
+        const currentKg = Number(row.kg_totales) * (1 - mermaPct);
+
+        stockMap[key].producido += Number(row.kg_totales);
+        stockMap[key].estimado += currentKg;
+        stockMap[key].merma += (Number(row.kg_totales) - currentKg);
+      }
+    });
+
+    // Final calculations
+    Object.values(stockMap).forEach(s => {
+      s.disponible = Math.max(0, s.estimado - s.vendido); // Don't show negative stock natively unless required
+    });
+
+    return stockMap;
+  }, [produccionData, allTimeSales, variedades]);
 
   // Total stock in chamber
-  const totalStockCamara = stockList.reduce((acc, item) => acc + (Number(item.stock_kg) || 0), 0);
+  const totalStockCamara = Object.values(stockEstimado).reduce((acc, item) => acc + item.disponible, 0);
 
   // Star cheese (highest sold)
   const starCheese = [...variedades].sort((a, b) => totals[b] - totals[a])[0];
-
-  const handleOpenEditStock = (item: CheeseStock) => {
-    setEditingStockItem({
-      variedad: item.variedad,
-      stock_kg: item.stock_kg,
-      lote: item.lote_detalle || ''
-    });
-    setIsStockModalOpen(true);
-  };
-
-  const handleSaveStock = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStockItem) return;
-    await updateStock(editingStockItem.variedad, Number(editingStockItem.stock_kg), editingStockItem.lote);
-    setIsStockModalOpen(false);
-    setEditingStockItem(null);
-  };
 
   // Color mapping for varieties
   const cheeseColors: Record<string, string> = {
@@ -135,7 +154,7 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
 
       </div>
 
-      {/* Control de Stock Disponible en Cámara */}
+      {/* Control de Stock Disponible en Cámara (Dinámico desde /produccion) */}
       <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] p-4 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e0d6c8]/60 pb-3">
           <div>
@@ -143,30 +162,26 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
               <PackageCheck size={18} className="text-[#8b7355]" />
               <span>Inventario Disponible en Cámara de Maduración / Frío</span>
             </h4>
-            <p className="text-xs text-[#6b645c]">Actualiza las existencias disponibles de cada queso para control de producción y stock</p>
+            <p className="text-xs text-[#6b645c]">Calculado dinámicamente sumando la producción, descontando la merma y restando las ventas históricas totales.</p>
           </div>
-
-          <button
-            onClick={() => {
-              setEditingStockItem({ variedad: 'Pecorino', stock_kg: 0, lote: '' });
-              setIsStockModalOpen(true);
-            }}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#8b7355] text-white rounded-lg text-xs font-bold hover:bg-[#7a6448] transition-colors shadow-xs self-start sm:self-auto"
-          >
-            <Plus size={14} />
-            <span>Ajustar Stock / Ingreso</span>
-          </button>
+          
+          <div className="bg-[#f4ebd8]/70 px-3 py-1.5 rounded-lg border border-[#e0d6c8] text-xs font-bold text-[#8b7355]">
+            Sincronizado con Producción y Ventas
+          </div>
         </div>
 
         {/* Cheese Stock Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {variedades.map(varName => {
-            const stockItem = stockList.find(s => s.variedad.toLowerCase() === varName.toLowerCase()) || {
+            const stockItem = stockEstimado[varName.toLowerCase()] || {
               variedad: varName,
-              stock_kg: 0,
-              lote_detalle: ''
+              producido: 0,
+              merma: 0,
+              estimado: 0,
+              vendido: 0,
+              disponible: 0
             };
-            const kgSold = totals[varName];
+            const kgSoldYear = totals[varName];
 
             return (
               <div 
@@ -176,29 +191,25 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold text-[#3e3a35]">{varName}</span>
-                    <button
-                      onClick={() => handleOpenEditStock(stockItem)}
-                      className="p-1 text-[#6b645c] hover:text-[#8b7355] rounded hover:bg-[#e0d6c8]/50 transition-colors"
-                      title="Editar stock de esta variedad"
-                    >
-                      <Pencil size={12} />
-                    </button>
                   </div>
 
                   <p className="text-lg font-black text-amber-950 font-mono">
-                    {formatKg(Number(stockItem.stock_kg) || 0)}
+                    {formatKg(stockItem.disponible)}
                   </p>
 
-                  {stockItem.lote_detalle && (
-                    <p className="text-[10px] text-[#6b645c] truncate mt-0.5" title={stockItem.lote_detalle}>
-                      {stockItem.lote_detalle}
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    <p className="text-[9px] text-emerald-700 font-medium">
+                      + Producido: {formatKg(stockItem.estimado)} 
                     </p>
-                  )}
+                    <p className="text-[9px] text-rose-700 font-medium">
+                      - Ventas Totales: {formatKg(stockItem.vendido)}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="mt-2.5 pt-2 border-t border-[#e0d6c8]/60 text-[10px] text-[#6b645c] flex justify-between">
+                <div className="mt-2.5 pt-2 border-t border-[#e0d6c8]/60 text-[10px] text-[#6b645c] flex justify-between" title="Ventas del año seleccionado">
                   <span>Vendido ({selectedYear}):</span>
-                  <span className="font-bold text-[#3e3a35]">{formatKg(kgSold)}</span>
+                  <span className="font-bold text-[#3e3a35]">{formatKg(kgSoldYear)}</span>
                 </div>
               </div>
             );
@@ -328,81 +339,6 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
           </ResponsiveContainer>
         </div>
       </div>
-
-      {/* Modal de Ajuste de Stock en Cámara */}
-      {isStockModalOpen && editingStockItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-[#faf9f6] rounded-2xl border border-[#e0d6c8] shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="p-4 border-b border-[#e0d6c8] flex justify-between items-center bg-[#f4ebd8]">
-              <h3 className="text-base font-bold text-[#3e3a35] flex items-center space-x-1.5">
-                <PackageCheck size={18} className="text-[#8b7355]" />
-                <span>Ajustar Stock en Cámara</span>
-              </h3>
-              <button
-                onClick={() => setIsStockModalOpen(false)}
-                className="p-1 text-[#6b645c] hover:text-[#3e3a35] rounded-lg transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveStock} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-[#6b645c] mb-1">Variedad de Queso</label>
-                <select
-                  value={editingStockItem.variedad}
-                  onChange={(e) => setEditingStockItem({ ...editingStockItem, variedad: e.target.value })}
-                  className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] font-bold outline-none focus:ring-1 focus:ring-[#8b7355]"
-                >
-                  {variedades.map(v => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#6b645c] mb-1">Stock Disponible en Cámara (Kilogramos)</label>
-                <input
-                  required
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={editingStockItem.stock_kg}
-                  onChange={(e) => setEditingStockItem({ ...editingStockItem, stock_kg: parseFloat(e.target.value) || 0 })}
-                  className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] font-bold outline-none focus:ring-1 focus:ring-[#8b7355]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#6b645c] mb-1">Lote / Detalle Maduración</label>
-                <input
-                  type="text"
-                  placeholder="Ej. Lote septiembre - 60 días maduración"
-                  value={editingStockItem.lote || ''}
-                  onChange={(e) => setEditingStockItem({ ...editingStockItem, lote: e.target.value })}
-                  className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] outline-none focus:ring-1 focus:ring-[#8b7355]"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-[#e0d6c8] flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setIsStockModalOpen(false)}
-                  className="px-4 py-2 border border-[#e0d6c8] text-[#6b645c] rounded-xl text-xs sm:text-sm font-semibold hover:bg-[#f4ebd8] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#8b7355] text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-[#7a6448] transition-colors shadow-xs"
-                >
-                  Guardar en Cámara
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );
