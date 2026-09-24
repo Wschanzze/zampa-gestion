@@ -1,15 +1,16 @@
 import { useState } from 'react';
 // @ts-ignore
-import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X } from 'lucide-react';
+import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import CashFlow from './pages/CashFlow';
 import CuentasCorrientes from './pages/CuentasCorrientes';
 import Queseria from './pages/Queseria';
+import Listas from './pages/Listas';
 
 import { useSupabaseTransactions } from './lib/api';
 
-type TabType = 'dashboard' | 'queseria' | 'cuentas-corrientes' | 'cashflow' | 'transactions';
+type TabType = 'dashboard' | 'queseria' | 'cuentas-corrientes' | 'cashflow' | 'transactions' | 'listas';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -152,6 +153,20 @@ function App() {
             <TableProperties size={20} />
             <span>Base de Datos</span>
           </button>
+
+          <div className="pt-4 mt-4 border-t border-[#e0d6c8]/50">
+            <button
+              onClick={() => handleTabChange('listas')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
+                activeTab === 'listas' 
+                  ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
+                  : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
+              }`}
+            >
+              <ListTodo size={20} />
+              <span>Listas y Parámetros</span>
+            </button>
+          </div>
         </nav>
       </aside>
 
@@ -229,6 +244,20 @@ function App() {
             <TableProperties size={20} />
             <span>Base de Datos</span>
           </button>
+
+          <div className="pt-4 mt-4 border-t border-[#e0d6c8]/50">
+            <button
+              onClick={() => setActiveTab('listas')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
+                activeTab === 'listas' 
+                  ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                  : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
+              }`}
+            >
+              <ListTodo size={20} />
+              <span>Listas y Parámetros</span>
+            </button>
+          </div>
         </nav>
       </aside>
 
@@ -249,6 +278,7 @@ function App() {
               {activeTab === 'cuentas-corrientes' && 'Cuentas Corrientes y Saldos'}
               {activeTab === 'cashflow' && 'Flujo de Caja Mensual'}
               {activeTab === 'transactions' && 'Movimientos (Base de Datos)'}
+              {activeTab === 'listas' && 'Listas y Parámetros del Sistema'}
             </h2>
             <span className="text-[11px] font-semibold text-[#8b7355] bg-[#f4ebd8]/60 px-2 py-0.5 rounded-md hidden sm:inline border border-[#e0d6c8]/60">
               Gestión Ovina
@@ -278,6 +308,7 @@ function App() {
                   />
                 )}
                 {activeTab === 'cashflow' && <CashFlow data={data} />}
+                {activeTab === 'listas' && <Listas />}
                 {activeTab === 'transactions' && (
                   <Transactions 
                     data={data} 

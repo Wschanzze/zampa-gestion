@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Transaction } from '../utils/calculations';
+import { useListas } from '../lib/api';
 // @ts-ignore
 import { X, Sparkles, Calculator } from 'lucide-react';
 
@@ -36,27 +37,33 @@ const TransactionForm: React.FC<Props> = ({
     Ricota: 0,
   });
 
-  // Autocomplete options derived dynamically from existing database
-  const autocompleteLists = useMemo(() => {
-    const provs = new Set<string>();
-    const rubros = new Set<string>();
-    const subrubros = new Set<string>();
-    const cuentas = new Set<string>(['EFECTIVO', 'BANCO', 'PENDIENTE', 'CAJA CHICA']);
+  const { entidades, rubros, subrubros, cuentas, unidades } = useListas();
 
+  // Autocomplete options derived dynamically from existing database + Listas
+  const autocompleteLists = useMemo(() => {
+    const provs = new Set<string>(entidades.map(e => e.nombre));
+    const rubs = new Set<string>(rubros.map(r => r.nombre));
+    const subrubs = new Set<string>(subrubros.map(s => s.nombre));
+    const cuents = new Set<string>(cuentas.map(c => c.nombre));
+    const unids = new Set<string>(unidades.map(u => u.nombre));
+
+    // Also include existing data just in case there are legacy items
     existingData.forEach(item => {
       if (item['Prov/Cliente']) provs.add(item['Prov/Cliente'].trim());
-      if (item.Rubro) rubros.add(item.Rubro.trim());
-      if (item['Subrubro/Producto']) subrubros.add(item['Subrubro/Producto'].trim());
-      if (item.Cuenta) cuentas.add(item.Cuenta.trim());
+      if (item.Rubro) rubs.add(item.Rubro.trim());
+      if (item['Subrubro/Producto']) subrubs.add(item['Subrubro/Producto'].trim());
+      if (item.Cuenta) cuents.add(item.Cuenta.trim());
+      if (item.Subactividad) unids.add(item.Subactividad.trim());
     });
 
     return {
       proveedores: Array.from(provs).sort(),
-      rubros: Array.from(rubros).sort(),
-      subrubros: Array.from(subrubros).sort(),
-      cuentas: Array.from(cuentas).sort(),
+      rubros: Array.from(rubs).sort(),
+      subrubros: Array.from(subrubs).sort(),
+      cuentas: Array.from(cuents).sort(),
+      unidades: Array.from(unids).sort(),
     };
-  }, [existingData]);
+  }, [existingData, entidades, rubros, subrubros, cuentas, unidades]);
 
   // Load initialData when in Edit mode
   useEffect(() => {
@@ -289,10 +296,10 @@ const TransactionForm: React.FC<Props> = ({
                 onChange={handleChange} 
                 className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-medium"
               >
-                <option value="TAMBO">TAMBO</option>
-                <option value="RECRIA">RECRÍA</option>
-                <option value="QUESERIA">QUESERÍA</option>
-                <option value="COMUN">COMÚN</option>
+                <option value="">Seleccione...</option>
+                {autocompleteLists.unidades.map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
               </select>
             </div>
 

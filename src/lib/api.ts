@@ -238,6 +238,71 @@ const DEFAULT_CHEESE_STOCK: CheeseStock[] = [
   { variedad: 'Ricota', stock_kg: 35, lote_detalle: 'Fresco' },
 ];
 
+export const useListas = () => {
+  const [entidades, setEntidades] = useState<any[]>([]);
+  const [rubros, setRubros] = useState<any[]>([]);
+  const [subrubros, setSubrubros] = useState<any[]>([]);
+  const [cuentas, setCuentas] = useState<any[]>([]);
+  const [unidades, setUnidades] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLists = async () => {
+    setLoading(true);
+    try {
+      const [
+        { data: eData },
+        { data: rData },
+        { data: sData },
+        { data: cData },
+        { data: uData }
+      ] = await Promise.all([
+        supabase.from('zampa_entidades').select('*').order('nombre'),
+        supabase.from('zampa_rubros').select('*').order('nombre'),
+        supabase.from('zampa_subrubros').select('*').order('nombre'),
+        supabase.from('zampa_cuentas').select('*').order('nombre'),
+        supabase.from('zampa_unidades_negocio').select('*').order('nombre')
+      ]);
+
+      setEntidades(eData || []);
+      setRubros(rData || []);
+      setSubrubros(sData || []);
+      setCuentas(cData || []);
+      setUnidades(uData || []);
+    } catch (err) {
+      console.error('Error fetching lists', err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchLists();
+  }, []);
+
+  const addEntity = async (table: string, payload: any) => {
+    const { data, error } = await supabase.from(table).insert(payload).select();
+    if (error) {
+      alert('Error agregando item: ' + error.message);
+      return null;
+    }
+    fetchLists(); // reload lists
+    return data?.[0];
+  };
+
+  const deleteEntity = async (table: string, id: string) => {
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) {
+      alert('Error eliminando item: ' + error.message);
+      return false;
+    }
+    fetchLists();
+    return true;
+  };
+
+  return {
+    entidades, rubros, subrubros, cuentas, unidades, loading, fetchLists, addEntity, deleteEntity
+  };
+};
+
 export const useQueseriaStock = () => {
   const [stockList, setStockList] = useState<CheeseStock[]>(() => {
     const saved = localStorage.getItem('zampa_stock_camara');
