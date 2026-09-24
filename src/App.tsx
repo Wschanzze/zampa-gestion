@@ -22,6 +22,16 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Mover este Hook ARRIBA de los condicionales (regla de React)
+  const { 
+    data, 
+    loading, 
+    addTransaction: handleAddTransaction, 
+    updateTransaction: handleUpdateTransaction, 
+    deleteTransaction: handleDeleteTransaction,
+    registerPayment 
+  } = useSupabaseTransactions();
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -48,15 +58,6 @@ function App() {
   if (!session) {
     return <Login />;
   }
-  
-  const { 
-    data, 
-    loading, 
-    addTransaction: handleAddTransaction, 
-    updateTransaction: handleUpdateTransaction, 
-    deleteTransaction: handleDeleteTransaction,
-    registerPayment 
-  } = useSupabaseTransactions();
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
