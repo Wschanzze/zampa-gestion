@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProduccion } from '../lib/api';
 // @ts-ignore
-import { Beaker, Trash2, CheckCircle2, ChevronRight, Save, LockKeyhole } from 'lucide-react';
+import { Trash2, CheckCircle2, ChevronRight, Save } from 'lucide-react';
 
 const PIN_ACCESO = '2024';
 
@@ -90,10 +90,12 @@ const CargaOperario: React.FC = () => {
         />
         <div className="w-full max-w-sm relative z-10">
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-[#e0d6c8] text-center">
-            <div className="w-16 h-16 bg-[#8b7355] rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <LockKeyhole size={32} className="text-white" />
-            </div>
-            <h2 className="text-2xl font-black text-[#3e3a35] mb-1">Acceso Quesería</h2>
+            <img 
+              src="/logo negro.png" 
+              alt="ZAMPA" 
+              className="h-24 w-auto mx-auto mb-2 object-contain opacity-90 mix-blend-multiply" 
+            />
+            <h2 className="text-xl font-black text-[#3e3a35] mb-1 uppercase tracking-wide">Quesería</h2>
             <p className="text-[#6b645c] text-sm mb-6">Ingrese su código de operario</p>
             
             <form onSubmit={handleLogin} className="space-y-4">
@@ -123,13 +125,14 @@ const CargaOperario: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f4ebd8] pb-12 font-sans relative">
-      <header className="bg-white px-5 py-4 shadow-sm border-b border-[#e0d6c8] sticky top-0 z-20">
-        <h1 className="text-xl font-black text-[#8b7355] flex items-center gap-2">
-          <Beaker size={24} />
-          CARGA DE PRODUCCIÓN
-        </h1>
-        <p className="text-xs text-[#6b645c] font-medium mt-1">
-          Registro rápido en planta
+      <header className="bg-white px-5 py-4 shadow-sm border-b border-[#e0d6c8] sticky top-0 z-20 text-center">
+        <img 
+          src="/logo negro.png" 
+          alt="ZAMPA" 
+          className="h-10 w-auto mx-auto object-contain opacity-95 mix-blend-multiply" 
+        />
+        <p className="text-[10px] text-[#6b645c] font-bold mt-1.5 uppercase tracking-widest">
+          Registro de Planta
         </p>
       </header>
 
