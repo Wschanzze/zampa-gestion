@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   TableProperties, 
@@ -15,27 +16,57 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-type TabType = 'dashboard' | 'queseria' | 'cuentas-corrientes' | 'cashflow' | 'transactions' | 'listas';
-
 interface SidebarProps {
-  activeTab: TabType;
-  setActiveTab: (tab: TabType) => void;
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
+  onNavigate?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
-  const [configOpen, setConfigOpen] = useState(false);
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, onNavigate }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const isConfigRoute = location.pathname.startsWith('/configuracion') || location.pathname === '/listas';
+  const [configOpen, setConfigOpen] = useState(isConfigRoute);
+
+  useEffect(() => {
+    if (isConfigRoute) {
+      setConfigOpen(true);
+    }
+  }, [isConfigRoute]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
 
-  const navItemClass = (tabId: string, isSubItem = false) => `
+  const isActive = (path: string) => {
+    if (path === '/dashboard') {
+      return location.pathname === '/' || location.pathname === '/dashboard';
+    }
+    if (path === '/datos') {
+      return location.pathname === '/datos' || location.pathname === '/transactions';
+    }
+    if (path === '/flujo-caja') {
+      return location.pathname === '/flujo-caja' || location.pathname === '/cashflow';
+    }
+    if (path === '/configuracion/parametros') {
+      return location.pathname === '/configuracion/parametros' || location.pathname === '/listas';
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  const handleItemClick = (path: string) => {
+    navigate(path);
+    if (onNavigate) {
+      onNavigate();
+    }
+  };
+
+  const navItemClass = (path: string, isSubItem = false) => `
     group flex items-center w-full px-3 py-2 text-sm rounded-md transition-all duration-200 cursor-pointer relative z-10 overflow-hidden
     ${isCollapsed ? 'justify-center' : 'space-x-3'}
     ${isSubItem && !isCollapsed ? 'pl-9' : ''}
-    ${activeTab === tabId 
+    ${isActive(path) 
       ? 'bg-white/80 text-[#2b2824] shadow-sm border border-[#e0d6c8] font-bold' 
       : 'text-[#4a443c] font-semibold hover:bg-white/50 hover:text-[#2b2824]'
     }
@@ -82,28 +113,28 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
       
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar relative z-10">
-        <div onClick={() => setActiveTab('dashboard')} className={navItemClass('dashboard')} title="Dashboard">
-          <LayoutDashboard size={18} className={`flex-shrink-0 ${activeTab === 'dashboard' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+        <div onClick={() => handleItemClick('/dashboard')} className={navItemClass('/dashboard')} title="Dashboard">
+          <LayoutDashboard size={18} className={`flex-shrink-0 ${isActive('/dashboard') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
           <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Dashboard</span>
         </div>
         
-        <div onClick={() => setActiveTab('queseria')} className={navItemClass('queseria')} title="Quesería">
-          <PackageCheck size={18} className={`flex-shrink-0 ${activeTab === 'queseria' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+        <div onClick={() => handleItemClick('/queseria')} className={navItemClass('/queseria')} title="Quesería">
+          <PackageCheck size={18} className={`flex-shrink-0 ${isActive('/queseria') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
           <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Quesería</span>
         </div>
         
-        <div onClick={() => setActiveTab('cuentas-corrientes')} className={navItemClass('cuentas-corrientes')} title="Cuentas Corrientes">
-          <WalletCards size={18} className={`flex-shrink-0 ${activeTab === 'cuentas-corrientes' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+        <div onClick={() => handleItemClick('/cuentas-corrientes')} className={navItemClass('/cuentas-corrientes')} title="Cuentas Corrientes">
+          <WalletCards size={18} className={`flex-shrink-0 ${isActive('/cuentas-corrientes') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
           <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Ctas. Corrientes</span>
         </div>
 
-        <div onClick={() => setActiveTab('cashflow')} className={navItemClass('cashflow')} title="Flujo de Caja">
-          <LineChart size={18} className={`flex-shrink-0 ${activeTab === 'cashflow' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+        <div onClick={() => handleItemClick('/flujo-caja')} className={navItemClass('/flujo-caja')} title="Flujo de Caja">
+          <LineChart size={18} className={`flex-shrink-0 ${isActive('/flujo-caja') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
           <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Flujo de Caja</span>
         </div>
         
-        <div onClick={() => setActiveTab('transactions')} className={navItemClass('transactions')} title="Base de Datos">
-          <TableProperties size={18} className={`flex-shrink-0 ${activeTab === 'transactions' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+        <div onClick={() => handleItemClick('/datos')} className={navItemClass('/datos')} title="Base de Datos">
+          <TableProperties size={18} className={`flex-shrink-0 ${isActive('/datos') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
           <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Base de Datos</span>
         </div>
       </nav>
@@ -137,8 +168,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
           </div>
           
           <div className={`transition-all duration-300 overflow-hidden ${!isCollapsed && configOpen ? 'max-h-20 opacity-100 mt-1 mb-2' : 'max-h-0 opacity-0 m-0'}`}>
-            <div onClick={() => setActiveTab('listas')} className={navItemClass('listas', true)}>
-              <ListTodo size={16} className={`flex-shrink-0 ${activeTab === 'listas' ? 'text-[#2b2824]' : 'text-[#8b7355]'}`} />
+            <div onClick={() => handleItemClick('/configuracion/parametros')} className={navItemClass('/configuracion/parametros', true)}>
+              <ListTodo size={16} className={`flex-shrink-0 ${isActive('/configuracion/parametros') ? 'text-[#2b2824]' : 'text-[#8b7355]'}`} />
               <span className="whitespace-nowrap">Parámetros</span>
             </div>
           </div>

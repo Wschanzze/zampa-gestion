@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 // @ts-ignore
 import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
@@ -13,14 +14,14 @@ import Sidebar from './components/Sidebar';
 import { useSupabaseTransactions } from './lib/api';
 import { supabase } from './lib/supabase';
 
-export type TabType = 'dashboard' | 'queseria' | 'cuentas-corrientes' | 'cashflow' | 'transactions' | 'listas';
-
 function App() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Mover este Hook ARRIBA de los condicionales (regla de React)
   const { 
@@ -59,9 +60,37 @@ function App() {
     return <Login />;
   }
 
-  const handleTabChange = (tab: TabType) => {
-    setActiveTab(tab);
+  const handleMobileNav = (path: string) => {
+    navigate(path);
     setIsMobileMenuOpen(false);
+  };
+
+  const getPageTitle = (pathname: string) => {
+    if (pathname === '/' || pathname === '/dashboard') return 'Resumen por Unidad de Negocio';
+    if (pathname === '/queseria') return 'Gestión de Quesería & Control de Cámara';
+    if (pathname === '/cuentas-corrientes') return 'Cuentas Corrientes y Saldos';
+    if (pathname === '/flujo-caja' || pathname === '/cashflow') return 'Flujo de Caja Mensual';
+    if (pathname === '/datos' || pathname === '/transactions') return 'Movimientos (Base de Datos)';
+    if (pathname === '/configuracion/parametros' || pathname === '/listas') return 'Listas y Parámetros del Sistema';
+    return 'Gestión Tambo Ovino';
+  };
+
+  const getMobileBadge = (pathname: string) => {
+    if (pathname === '/' || pathname === '/dashboard') return 'Dashboard';
+    if (pathname === '/queseria') return 'Quesería';
+    if (pathname === '/cuentas-corrientes') return 'Ctas. Ctes.';
+    if (pathname === '/flujo-caja' || pathname === '/cashflow') return 'Flujo Caja';
+    if (pathname === '/datos' || pathname === '/transactions') return 'Base Datos';
+    if (pathname === '/configuracion/parametros' || pathname === '/listas') return 'Parámetros';
+    return 'Zampa';
+  };
+
+  const isCurrent = (path: string) => {
+    if (path === '/dashboard') return location.pathname === '/' || location.pathname === '/dashboard';
+    if (path === '/datos') return location.pathname === '/datos' || location.pathname === '/transactions';
+    if (path === '/flujo-caja') return location.pathname === '/flujo-caja' || location.pathname === '/cashflow';
+    if (path === '/configuracion/parametros') return location.pathname === '/configuracion/parametros' || location.pathname === '/listas';
+    return location.pathname === path;
   };
 
   return (
@@ -85,11 +114,7 @@ function App() {
         </div>
 
         <span className="text-[11px] font-bold px-2 py-0.5 bg-white/90 rounded-full text-[#8b7355] border border-[#e0d6c8]">
-          {activeTab === 'dashboard' && 'Dashboard'}
-          {activeTab === 'queseria' && 'Quesería'}
-          {activeTab === 'cuentas-corrientes' && 'Ctas. Ctes.'}
-          {activeTab === 'cashflow' && 'Flujo Caja'}
-          {activeTab === 'transactions' && 'Base Datos'}
+          {getMobileBadge(location.pathname)}
         </span>
       </div>
 
@@ -129,9 +154,9 @@ function App() {
 
         <nav className="flex-1 px-4 py-4 space-y-2 relative z-10">
           <button
-            onClick={() => handleTabChange('dashboard')}
+            onClick={() => handleMobileNav('/dashboard')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
-              activeTab === 'dashboard' 
+              isCurrent('/dashboard')
                 ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
                 : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
@@ -141,9 +166,9 @@ function App() {
           </button>
 
           <button
-            onClick={() => handleTabChange('queseria')}
+            onClick={() => handleMobileNav('/queseria')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
-              activeTab === 'queseria' 
+              isCurrent('/queseria')
                 ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
                 : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
@@ -153,9 +178,9 @@ function App() {
           </button>
           
           <button
-            onClick={() => handleTabChange('cuentas-corrientes')}
+            onClick={() => handleMobileNav('/cuentas-corrientes')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
-              activeTab === 'cuentas-corrientes' 
+              isCurrent('/cuentas-corrientes')
                 ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
                 : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
@@ -165,9 +190,9 @@ function App() {
           </button>
 
           <button
-            onClick={() => handleTabChange('cashflow')}
+            onClick={() => handleMobileNav('/flujo-caja')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
-              activeTab === 'cashflow' 
+              isCurrent('/flujo-caja')
                 ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
                 : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
@@ -177,9 +202,9 @@ function App() {
           </button>
           
           <button
-            onClick={() => handleTabChange('transactions')}
+            onClick={() => handleMobileNav('/datos')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
-              activeTab === 'transactions' 
+              isCurrent('/datos')
                 ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
                 : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
             }`}
@@ -190,9 +215,9 @@ function App() {
 
           <div className="pt-4 mt-4 border-t border-[#e0d6c8]/50">
             <button
-              onClick={() => handleTabChange('listas')}
+              onClick={() => handleMobileNav('/configuracion/parametros')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
-                activeTab === 'listas' 
+                isCurrent('/configuracion/parametros')
                   ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
                   : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
               }`}
@@ -206,8 +231,6 @@ function App() {
 
       {/* Desktop Sidebar Component */}
       <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
         isCollapsed={isSidebarCollapsed} 
         setIsCollapsed={setIsSidebarCollapsed} 
       />
@@ -224,12 +247,7 @@ function App() {
           {/* Header */}
           <header className="bg-white/80 backdrop-blur-md border-b border-[#e0d6c8] px-4 sm:px-6 md:px-8 py-4 sticky top-0 z-20 flex items-center justify-between">
             <h2 className="text-lg md:text-xl font-bold text-[#3e3a35] tracking-tight truncate">
-              {activeTab === 'dashboard' && 'Resumen por Unidad de Negocio'}
-              {activeTab === 'queseria' && 'Gestión de Quesería & Control de Cámara'}
-              {activeTab === 'cuentas-corrientes' && 'Cuentas Corrientes y Saldos'}
-              {activeTab === 'cashflow' && 'Flujo de Caja Mensual'}
-              {activeTab === 'transactions' && 'Movimientos (Base de Datos)'}
-              {activeTab === 'listas' && 'Listas y Parámetros del Sistema'}
+              {getPageTitle(location.pathname)}
             </h2>
             <span className="text-[11px] font-semibold text-[#8b7355] bg-[#f4ebd8]/60 px-2.5 py-1 rounded-md hidden sm:inline border border-[#e0d6c8]/60">
               Gestión Ovina
@@ -244,31 +262,45 @@ function App() {
                 <span className="text-xs font-semibold">Cargando datos desde Supabase...</span>
               </div>
             ) : (
-              <>
-                {activeTab === 'dashboard' && (
-                  <Dashboard 
-                    data={data} 
-                    onNavigateToCuentas={() => setActiveTab('cuentas-corrientes')} 
-                  />
-                )}
-                {activeTab === 'queseria' && <Queseria data={data} />}
-                {activeTab === 'cuentas-corrientes' && (
-                  <CuentasCorrientes 
-                    data={data} 
-                    onRegisterPayment={registerPayment} 
-                  />
-                )}
-                {activeTab === 'cashflow' && <CashFlow data={data} />}
-                {activeTab === 'listas' && <Listas />}
-                {activeTab === 'transactions' && (
-                  <Transactions 
-                    data={data} 
-                    onAdd={handleAddTransaction} 
-                    onUpdate={handleUpdateTransaction}
-                    onDelete={handleDeleteTransaction}
-                  />
-                )}
-              </>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <Dashboard 
+                      data={data} 
+                      onNavigateToCuentas={() => navigate('/cuentas-corrientes')} 
+                    />
+                  } 
+                />
+                <Route path="/queseria" element={<Queseria data={data} />} />
+                <Route 
+                  path="/cuentas-corrientes" 
+                  element={
+                    <CuentasCorrientes 
+                      data={data} 
+                      onRegisterPayment={registerPayment} 
+                    />
+                  } 
+                />
+                <Route path="/flujo-caja" element={<CashFlow data={data} />} />
+                <Route path="/cashflow" element={<Navigate to="/flujo-caja" replace />} />
+                <Route 
+                  path="/datos" 
+                  element={
+                    <Transactions 
+                      data={data} 
+                      onAdd={handleAddTransaction} 
+                      onUpdate={handleUpdateTransaction}
+                      onDelete={handleDeleteTransaction}
+                    />
+                  } 
+                />
+                <Route path="/transactions" element={<Navigate to="/datos" replace />} />
+                <Route path="/configuracion/parametros" element={<Listas />} />
+                <Route path="/listas" element={<Navigate to="/configuracion/parametros" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
             )}
           </div>
         </div>
@@ -277,9 +309,9 @@ function App() {
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#e0d6c8] z-30 flex items-center justify-around py-1.5 px-1 shadow-lg">
         <button
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => navigate('/dashboard')}
           className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            activeTab === 'dashboard' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
+            isCurrent('/dashboard') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <LayoutDashboard size={18} />
@@ -287,9 +319,9 @@ function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('queseria')}
+          onClick={() => navigate('/queseria')}
           className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            activeTab === 'queseria' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
+            isCurrent('/queseria') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <PackageCheck size={18} />
@@ -297,9 +329,9 @@ function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('cuentas-corrientes')}
+          onClick={() => navigate('/cuentas-corrientes')}
           className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            activeTab === 'cuentas-corrientes' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
+            isCurrent('/cuentas-corrientes') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <WalletCards size={18} />
@@ -307,9 +339,9 @@ function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('cashflow')}
+          onClick={() => navigate('/flujo-caja')}
           className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            activeTab === 'cashflow' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
+            isCurrent('/flujo-caja') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <LineChart size={18} />
@@ -317,9 +349,9 @@ function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('transactions')}
+          onClick={() => navigate('/datos')}
           className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            activeTab === 'transactions' ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
+            isCurrent('/datos') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
           }`}
         >
           <TableProperties size={18} />
