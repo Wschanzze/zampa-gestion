@@ -56,7 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
           style={{ backgroundImage: 'url("/IMG_9858.JPG")' }}
         />
         {/* Top Fade to White */}
-        <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white via-white/70 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-white via-white/80 to-transparent" />
       </div>
 
       {/* Collapse Toggle Button */}
@@ -68,15 +68,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
       </button>
 
       {/* Header / Brand */}
-      <div className={`flex flex-col items-center border-b border-[#e0d6c8]/60 px-4 pt-4 pb-6 relative z-10 transition-all duration-300 ${isCollapsed ? 'pb-4' : ''}`}>
+      <div className={`flex flex-col items-center border-b border-[#e0d6c8]/60 px-3 pt-5 relative z-10 transition-all duration-300 ${isCollapsed ? 'pb-4' : 'pb-6'}`}>
         <img 
           src="/logo negro.png" 
           alt="Zampa" 
-          className={`transition-all duration-300 object-contain mix-blend-multiply opacity-95 ${isCollapsed ? 'w-10 h-10' : 'w-20 h-20 mb-3'}`} 
+          className={`transition-all duration-300 object-contain mix-blend-multiply opacity-95 ${isCollapsed ? 'w-11 h-11' : 'w-28 h-28 mb-2'}`} 
         />
-        <div className={`flex flex-col items-center overflow-hidden text-center transition-all duration-300 origin-top ${isCollapsed ? 'h-0 opacity-0 scale-y-0' : 'h-[30px] opacity-100 scale-y-100'}`}>
-          <span className="text-base font-bold text-[#2b2824] tracking-tight leading-none whitespace-nowrap">ZAMPA GESTIÓN</span>
-          <span className="text-[10px] text-[#8b7355] font-bold tracking-widest uppercase mt-1.5 whitespace-nowrap">Ovino & Quesería</span>
+        <div className={`flex flex-col items-center text-center transition-all duration-300 origin-top overflow-hidden ${isCollapsed ? 'max-h-0 opacity-0 scale-y-0 m-0' : 'max-h-28 opacity-100 scale-y-100 mt-1'}`}>
+          <span className="text-base font-extrabold text-[#2b2824] tracking-tight leading-normal whitespace-nowrap">ZAMPA GESTIÓN</span>
+          <span className="text-[11px] text-[#8b7355] font-bold tracking-widest uppercase mt-0.5 leading-normal whitespace-nowrap">Ovino & Quesería</span>
         </div>
       </div>
       
