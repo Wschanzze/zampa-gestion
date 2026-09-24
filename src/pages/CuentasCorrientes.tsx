@@ -159,22 +159,22 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white/95 p-4 rounded-xl shadow-sm border border-[#e0d6c8] flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white/95 p-3.5 sm:p-4 rounded-xl shadow-sm border border-[#e0d6c8] flex flex-col md:flex-row md:items-center justify-between gap-3">
         
         {/* Search */}
-        <div className="relative">
+        <div className="relative w-full md:w-80">
           <Search size={16} className="absolute left-3 top-2.5 text-[#6b645c]" />
           <input 
             type="text" 
             placeholder="Buscar por cliente o proveedor..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 pr-3 py-1.5 border border-[#e0d6c8] rounded-lg text-xs md:text-sm bg-[#faf9f6] text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none w-64 md:w-80"
+            className="w-full pl-9 pr-3 py-2 sm:py-1.5 border border-[#e0d6c8] rounded-lg text-xs md:text-sm bg-[#faf9f6] text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
           />
         </div>
 
-        {/* Tabs Filter */}
-        <div className="flex p-1 bg-[#eae0cd]/60 rounded-xl border border-[#e0d6c8] text-xs font-semibold">
+        {/* Tabs Filter (Horizontally scrollable on mobile) */}
+        <div className="flex p-1 bg-[#eae0cd]/60 rounded-xl border border-[#e0d6c8] text-xs font-semibold overflow-x-auto max-w-full whitespace-nowrap">
           <button
             onClick={() => setFilterType('TODOS')}
             className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'TODOS' ? 'bg-white text-[#3e3a35] shadow-xs' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
@@ -185,13 +185,13 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
             onClick={() => setFilterType('CLIENTES')}
             className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'CLIENTES' ? 'bg-white text-emerald-800 shadow-xs font-bold' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
           >
-            Clientes a Cobrar ({pendientes.filter(p => p.saldo > 0).length})
+            Clientes ({pendientes.filter(p => p.saldo > 0).length})
           </button>
           <button
             onClick={() => setFilterType('PROVEEDORES')}
             className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'PROVEEDORES' ? 'bg-white text-rose-800 shadow-xs font-bold' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
           >
-            Proveedores a Pagar ({pendientes.filter(p => p.saldo < 0).length})
+            Proveedores ({pendientes.filter(p => p.saldo < 0).length})
           </button>
           <button
             onClick={() => setFilterType('SALDADOS')}
@@ -201,6 +201,11 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
           </button>
         </div>
 
+      </div>
+
+      {/* Mobile scroll hint */}
+      <div className="sm:hidden text-[11px] text-[#8b7355] bg-[#f4ebd8]/70 px-3 py-1.5 rounded-lg border border-[#e0d6c8] text-center font-medium">
+        ↔ Desliza hacia los lados para ver los saldos y botones de acción
       </div>
 
       {/* Main Entities Table */}
