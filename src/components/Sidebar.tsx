@@ -32,82 +32,78 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
   };
 
   const navItemClass = (tabId: string, isSubItem = false) => `
-    w-full flex items-center px-4 py-3 transition-colors font-medium cursor-pointer
+    group flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-all duration-200
     ${isCollapsed ? 'justify-center' : 'space-x-3'}
-    ${isSubItem && !isCollapsed ? 'pl-11' : ''}
+    ${isSubItem && !isCollapsed ? 'pl-9' : ''}
     ${activeTab === tabId 
-      ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8] rounded-xl' 
-      : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm rounded-xl'
+      ? 'bg-slate-100 text-slate-900' 
+      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
     }
   `;
 
   return (
-    <aside className={`
-      hidden md:flex flex-col relative z-20 flex-shrink-0 overflow-visible transition-all duration-300
-      bg-[#f4ebd8] border-r border-[#e0d6c8] shadow-sm
-      ${isCollapsed ? 'w-20' : 'w-64'}
-    `}>
+    <aside 
+      className={`
+        hidden md:flex flex-col relative z-20 flex-shrink-0 bg-white border-r border-slate-200 transition-all duration-300
+        ${isCollapsed ? 'w-[72px]' : 'w-64'}
+      `}
+    >
       {/* Collapse Toggle Button */}
       <button 
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-6 bg-white border border-[#e0d6c8] text-[#6b645c] hover:text-[#3e3a35] rounded-full p-1 shadow-md z-30 flex items-center justify-center transition-transform"
+        className="absolute -right-3 top-7 bg-white border border-slate-200 text-slate-400 hover:text-slate-900 rounded-full p-1 shadow-sm z-30 flex items-center justify-center transition-transform hover:scale-110"
       >
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      {/* Cheese Sidebar Background */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-20 bg-center bg-no-repeat bg-cover z-0 filter blur-[2px]"
-        style={{ backgroundImage: 'url("/IMG_9858.JPG")' }}
-      />
-      
-      <div className="p-5 flex flex-col items-center relative z-10 min-h-[120px]">
+      {/* Header / Brand */}
+      <div className="h-16 flex items-center border-b border-slate-100 px-4 mt-2">
         <img 
           src="/logo negro.png" 
-          alt="Zampa Gestión" 
-          className={`transition-all duration-300 opacity-90 mix-blend-multiply ${isCollapsed ? 'w-10 mb-2' : 'w-20 mb-3'}`} 
+          alt="Zampa" 
+          className={`transition-all duration-300 object-contain ${isCollapsed ? 'w-8 h-8 mx-auto' : 'w-8 h-8 mr-3'}`} 
         />
         {!isCollapsed && (
-          <>
-            <h1 className="text-lg font-bold text-center text-[#3e3a35] leading-tight">Gestión Tambo</h1>
-            <p className="text-[#8b7355] text-[10px] font-bold tracking-widest uppercase mt-0.5 text-center">Ovino & Quesería</p>
-          </>
+          <div className="flex flex-col overflow-hidden">
+            <span className="text-sm font-bold text-slate-900 tracking-tight leading-none truncate">ZAMPA GESTIÓN</span>
+            <span className="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-1 truncate">Tambo & Quesería</span>
+          </div>
         )}
       </div>
       
-      <nav className="flex-1 px-3 space-y-1.5 relative z-10 overflow-y-auto pb-4 custom-scrollbar">
+      {/* Main Navigation */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
         <div onClick={() => setActiveTab('dashboard')} className={navItemClass('dashboard')}>
-          <LayoutDashboard size={20} className="flex-shrink-0" />
+          <LayoutDashboard size={18} className={`flex-shrink-0 ${activeTab === 'dashboard' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-900'}`} />
           {!isCollapsed && <span>Dashboard</span>}
         </div>
         
         <div onClick={() => setActiveTab('queseria')} className={navItemClass('queseria')}>
-          <PackageCheck size={20} className="flex-shrink-0" />
+          <PackageCheck size={18} className={`flex-shrink-0 ${activeTab === 'queseria' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-900'}`} />
           {!isCollapsed && <span>Quesería</span>}
         </div>
         
         <div onClick={() => setActiveTab('cuentas-corrientes')} className={navItemClass('cuentas-corrientes')}>
-          <WalletCards size={20} className="flex-shrink-0" />
-          {!isCollapsed && <span>Cuentas Corrientes</span>}
+          <WalletCards size={18} className={`flex-shrink-0 ${activeTab === 'cuentas-corrientes' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-900'}`} />
+          {!isCollapsed && <span>Ctas. Corrientes</span>}
         </div>
 
         <div onClick={() => setActiveTab('cashflow')} className={navItemClass('cashflow')}>
-          <LineChart size={20} className="flex-shrink-0" />
+          <LineChart size={18} className={`flex-shrink-0 ${activeTab === 'cashflow' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-900'}`} />
           {!isCollapsed && <span>Flujo de Caja</span>}
         </div>
         
         <div onClick={() => setActiveTab('transactions')} className={navItemClass('transactions')}>
-          <TableProperties size={20} className="flex-shrink-0" />
+          <TableProperties size={18} className={`flex-shrink-0 ${activeTab === 'transactions' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-900'}`} />
           {!isCollapsed && <span>Base de Datos</span>}
         </div>
+      </nav>
 
-        {/* Separator */}
-        <div className="pt-3 pb-1">
-          <div className="border-t border-[#e0d6c8]/60"></div>
-        </div>
-
-        {/* Settings Accordion */}
-        <div>
+      {/* Footer Navigation (Settings & Logout) */}
+      <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+        
+        {/* Settings Submenu */}
+        <div className="mb-2">
           <div 
             onClick={() => {
               if (isCollapsed) {
@@ -117,39 +113,40 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
                 setConfigOpen(!configOpen);
               }
             }}
-            className={`w-full flex items-center px-4 py-3 transition-colors font-medium cursor-pointer rounded-xl text-[#5c544d] hover:bg-white/50 backdrop-blur-sm ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+            className={`group flex items-center w-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md transition-all duration-200 cursor-pointer ${isCollapsed ? 'justify-center' : 'justify-between'}`}
           >
             <div className="flex items-center space-x-3">
-              <Settings size={20} className="flex-shrink-0" />
+              <Settings size={18} className="flex-shrink-0 text-slate-400 group-hover:text-slate-900" />
               {!isCollapsed && <span>Configuración</span>}
             </div>
             {!isCollapsed && (
-              <div className="text-[#8b7355]">
-                {configOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <div className="text-slate-400">
+                {configOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </div>
             )}
           </div>
           
-          {/* Submenus */}
           {!isCollapsed && configOpen && (
-            <div className="mt-1 space-y-1">
+            <div className="mt-1 mb-2 space-y-1">
               <div onClick={() => setActiveTab('listas')} className={navItemClass('listas', true)}>
-                <ListTodo size={16} className="flex-shrink-0 text-[#8b7355]" />
-                <span className="text-sm">Listas y Parámetros</span>
+                <ListTodo size={16} className={`flex-shrink-0 ${activeTab === 'listas' ? 'text-slate-900' : 'text-slate-400'}`} />
+                <span>Parámetros</span>
               </div>
             </div>
           )}
         </div>
-      </nav>
 
-      <div className="p-4 relative z-10 border-t border-[#e0d6c8]/60">
-        <button 
-          onClick={handleLogout}
-          className={`w-full flex items-center px-4 py-2 text-rose-700 bg-rose-50/50 hover:bg-rose-100 rounded-lg transition-colors font-semibold ${isCollapsed ? 'justify-center' : 'space-x-2'}`}
-        >
-          <LogOut size={18} className="flex-shrink-0" />
-          {!isCollapsed && <span>Cerrar Sesión</span>}
-        </button>
+        {/* User Account / Logout */}
+        <div className="pt-2 border-t border-slate-200/60 mt-1">
+          <button 
+            onClick={handleLogout}
+            className={`group flex items-center w-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-700 rounded-md transition-all duration-200 ${isCollapsed ? 'justify-center' : 'space-x-3'}`}
+          >
+            <LogOut size={18} className="flex-shrink-0 text-slate-400 group-hover:text-red-600" />
+            {!isCollapsed && <span>Cerrar Sesión</span>}
+          </button>
+        </div>
+
       </div>
     </aside>
   );

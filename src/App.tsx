@@ -213,17 +213,17 @@ function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto relative bg-[#fdfdfc] flex flex-col h-full">
+      <main className="flex-1 overflow-y-auto relative bg-slate-50 flex flex-col h-full">
         {/* Watermark Background */}
         <div 
-          className="absolute inset-0 pointer-events-none opacity-[0.03] bg-center bg-no-repeat bg-cover z-0"
+          className="absolute inset-0 pointer-events-none opacity-[0.02] bg-center bg-no-repeat bg-cover z-0"
           style={{ backgroundImage: 'url("/ovejas_render.png")' }}
         />
         
         <div className="relative z-10 flex flex-col flex-1">
           {/* Header */}
-          <header className="bg-white/80 backdrop-blur-sm border-b border-[#e0d6c8] px-4 sm:px-6 md:px-8 py-3.5 shadow-xs sticky top-0 z-20 flex items-center justify-between">
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#3e3a35] truncate">
+          <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 md:px-8 py-4 sticky top-0 z-20 flex items-center justify-between">
+            <h2 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight truncate">
               {activeTab === 'dashboard' && 'Resumen por Unidad de Negocio'}
               {activeTab === 'queseria' && 'Gestión de Quesería & Control de Cámara'}
               {activeTab === 'cuentas-corrientes' && 'Cuentas Corrientes y Saldos'}
@@ -231,7 +231,7 @@ function App() {
               {activeTab === 'transactions' && 'Movimientos (Base de Datos)'}
               {activeTab === 'listas' && 'Listas y Parámetros del Sistema'}
             </h2>
-            <span className="text-[11px] font-semibold text-[#8b7355] bg-[#f4ebd8]/60 px-2 py-0.5 rounded-md hidden sm:inline border border-[#e0d6c8]/60">
+            <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md hidden sm:inline border border-slate-200">
               Gestión Ovina
             </span>
           </header>
