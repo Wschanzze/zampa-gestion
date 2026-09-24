@@ -347,3 +347,80 @@ export const useQueseriaStock = () => {
   return { stockList, loading, updateStock, refreshStock: fetchStock };
 };
 
+export interface ProduccionRecord {
+  id?: string;
+  fecha_elaboracion: string;
+  lote: string;
+  litros_leche: number;
+  producto: string;
+  tipo_queso: string | null;
+  kg_totales: number;
+  cantidad_grande: number;
+  cantidad_barra: number;
+  cantidad_tubo: number;
+  cantidad_chico: number;
+  cantidad_otro: number;
+  cantidad_camambert: number;
+  cantidad_ricota: number;
+  rendimiento?: number;
+  created_at?: string;
+}
+
+export const useProduccion = () => {
+  const [data, setData] = useState<ProduccionRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const { data: rows, error } = await supabase
+      .from('zampa_produccion_quesos')
+      .select('*')
+      .order('fecha_elaboracion', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching produccion:', error);
+    } else if (rows) {
+      setData(rows);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const addRecord = async (record: Omit<ProduccionRecord, 'id' | 'rendimiento' | 'created_at'>) => {
+    const { data: inserted, error } = await supabase
+      .from('zampa_produccion_quesos')
+      .insert([record])
+      .select();
+
+    if (error) {
+      console.error('Error insertando produccion:', error);
+      alert('Error al guardar: ' + error.message);
+      return false;
+    } else if (inserted && inserted[0]) {
+      setData(prev => [inserted[0], ...prev]);
+      return true;
+    }
+    return false;
+  };
+
+  const deleteRecord = async (id: string) => {
+    const { error } = await supabase
+      .from('zampa_produccion_quesos')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error eliminando produccion:', error);
+      alert('Error al eliminar: ' + error.message);
+      return false;
+    } else {
+      setData(prev => prev.filter(r => r.id !== id));
+      return true;
+    }
+  };
+
+  return { data, loading, addRecord, deleteRecord, refreshData: fetchData };
+};

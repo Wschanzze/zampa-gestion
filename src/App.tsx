@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 // @ts-ignore
-import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo } from 'lucide-react';
+import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo, Beaker } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import CashFlow from './pages/CashFlow';
 import CuentasCorrientes from './pages/CuentasCorrientes';
 import Queseria from './pages/Queseria';
+import Produccion from './pages/Produccion';
 import Listas from './pages/Listas';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
@@ -68,6 +69,7 @@ function App() {
   const getPageTitle = (pathname: string) => {
     if (pathname === '/' || pathname === '/dashboard') return 'Resumen por Unidad de Negocio';
     if (pathname === '/queseria') return 'Gestión de Quesería & Control de Cámara';
+    if (pathname === '/produccion') return 'Producción y Rendimiento';
     if (pathname === '/cuentas-corrientes') return 'Cuentas Corrientes y Saldos';
     if (pathname === '/flujo-caja' || pathname === '/cashflow') return 'Flujo de Caja Mensual';
     if (pathname === '/datos' || pathname === '/transactions') return 'Movimientos (Base de Datos)';
@@ -78,6 +80,7 @@ function App() {
   const getMobileBadge = (pathname: string) => {
     if (pathname === '/' || pathname === '/dashboard') return 'Dashboard';
     if (pathname === '/queseria') return 'Quesería';
+    if (pathname === '/produccion') return 'Producción';
     if (pathname === '/cuentas-corrientes') return 'Ctas. Ctes.';
     if (pathname === '/flujo-caja' || pathname === '/cashflow') return 'Flujo Caja';
     if (pathname === '/datos' || pathname === '/transactions') return 'Base Datos';
@@ -89,6 +92,7 @@ function App() {
     if (path === '/dashboard') return location.pathname === '/' || location.pathname === '/dashboard';
     if (path === '/datos') return location.pathname === '/datos' || location.pathname === '/transactions';
     if (path === '/flujo-caja') return location.pathname === '/flujo-caja' || location.pathname === '/cashflow';
+    if (path === '/produccion') return location.pathname === '/produccion';
     if (path === '/configuracion/parametros') return location.pathname === '/configuracion/parametros' || location.pathname === '/listas';
     return location.pathname === path;
   };
@@ -175,6 +179,18 @@ function App() {
           >
             <PackageCheck size={20} />
             <span>Quesería</span>
+          </button>
+
+          <button
+            onClick={() => handleMobileNav('/produccion')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
+              isCurrent('/produccion')
+                ? 'bg-white text-[#3e3a35] shadow-sm border border-[#e0d6c8] font-bold' 
+                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
+            }`}
+          >
+            <Beaker size={20} />
+            <span>Producción</span>
           </button>
           
           <button
@@ -274,6 +290,7 @@ function App() {
                   } 
                 />
                 <Route path="/queseria" element={<Queseria data={data} />} />
+                <Route path="/produccion" element={<Produccion />} />
                 <Route 
                   path="/cuentas-corrientes" 
                   element={

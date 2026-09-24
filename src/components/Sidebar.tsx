@@ -12,7 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Beaker
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -121,6 +122,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, onNaviga
         <div onClick={() => handleItemClick('/queseria')} className={navItemClass('/queseria')} title="Quesería">
           <PackageCheck size={18} className={`flex-shrink-0 ${isActive('/queseria') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
           <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Quesería</span>
+        </div>
+
+        <div onClick={() => handleItemClick('/produccion')} className={navItemClass('/produccion')} title="Producción">
+          <Beaker size={18} className={`flex-shrink-0 ${isActive('/produccion') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+          <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Producción</span>
         </div>
         
         <div onClick={() => handleItemClick('/cuentas-corrientes')} className={navItemClass('/cuentas-corrientes')} title="Cuentas Corrientes">
