@@ -130,13 +130,13 @@ const Produccion = () => {
     }));
   }, [filteredData]);
 
-  // Aggregation for Theoretical Stock in Chamber (calculated over ALL data, not just filtered)
+  // Aggregation for Theoretical Stock in Chamber (now affected by date filters)
   const stockEstimado = useMemo(() => {
     const map = new Map();
     const today = new Date();
     today.setHours(12, 0, 0, 0); // normalize time
 
-    data.forEach(row => {
+    filteredData.forEach(row => {
       const elaborationDate = new Date(row.fecha_elaboracion + 'T12:00:00Z');
       const diffTime = today.getTime() - elaborationDate.getTime();
       const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
@@ -177,7 +177,7 @@ const Produccion = () => {
       group.lotes.sort((a: any, b: any) => b.dias - a.dias);
       return group;
     }).sort((a, b) => b.kg_estimado - a.kg_estimado);
-  }, [data]);
+  }, [filteredData]);
 
   if (loading) {
     return (
