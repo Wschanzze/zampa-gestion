@@ -279,6 +279,16 @@ export const useListas = () => {
     return data?.[0];
   };
 
+  const updateEntity = async (table: string, id: string, payload: any) => {
+    const { data, error } = await supabase.from(table).update(payload).eq('id', id).select();
+    if (error) {
+      alert('Error actualizando item: ' + error.message);
+      return null;
+    }
+    fetchLists();
+    return data?.[0];
+  };
+
   const deleteEntity = async (table: string, id: string) => {
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) {
@@ -290,7 +300,7 @@ export const useListas = () => {
   };
 
   return {
-    entidades, rubros, subrubros, cuentas, unidades, loading, fetchLists, addEntity, deleteEntity
+    entidades, rubros, subrubros, cuentas, unidades, loading, fetchLists, addEntity, updateEntity, deleteEntity
   };
 };
 
