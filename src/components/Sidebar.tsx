@@ -32,32 +32,37 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
   };
 
   const navItemClass = (tabId: string, isSubItem = false) => `
-    group flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer relative z-10
+    group flex items-center w-full px-3 py-2 text-sm rounded-md transition-all duration-200 cursor-pointer relative z-10 overflow-hidden
     ${isCollapsed ? 'justify-center' : 'space-x-3'}
     ${isSubItem && !isCollapsed ? 'pl-9' : ''}
     ${activeTab === tabId 
-      ? 'bg-white/80 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
-      : 'text-[#6b645c] hover:bg-white/40 hover:text-[#3e3a35]'
+      ? 'bg-white/80 text-[#2b2824] shadow-sm border border-[#e0d6c8] font-bold' 
+      : 'text-[#4a443c] font-semibold hover:bg-white/50 hover:text-[#2b2824]'
     }
   `;
 
   return (
     <aside 
       className={`
-        hidden md:flex flex-col relative z-20 flex-shrink-0 bg-[#f4ebd8] border-r border-[#e0d6c8] transition-all duration-300 overflow-hidden
+        hidden md:flex flex-col relative z-20 flex-shrink-0 bg-[#f4ebd8] border-r border-[#e0d6c8] transition-all duration-300
         ${isCollapsed ? 'w-[72px]' : 'w-64'}
       `}
     >
-      {/* Cheese Sidebar Background */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-20 bg-center bg-no-repeat bg-cover z-0 filter blur-[2px]"
-        style={{ backgroundImage: 'url("/IMG_9858.JPG")' }}
-      />
+      {/* Background Image Container */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        {/* Cheese Sidebar Background */}
+        <div 
+          className="absolute inset-0 opacity-20 bg-center bg-no-repeat bg-cover filter blur-[2px]"
+          style={{ backgroundImage: 'url("/IMG_9858.JPG")' }}
+        />
+        {/* Top Fade to White */}
+        <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white via-white/70 to-transparent" />
+      </div>
 
       {/* Collapse Toggle Button */}
       <button 
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-7 bg-[#f4ebd8] border border-[#e0d6c8] text-[#8b7355] hover:text-[#3e3a35] hover:bg-white rounded-full p-1 shadow-sm z-30 flex items-center justify-center transition-transform hover:scale-110"
+        className="absolute -right-3 top-7 bg-[#f4ebd8] border border-[#e0d6c8] text-[#8b7355] hover:text-[#2b2824] hover:bg-white rounded-full p-1 shadow-sm z-30 flex items-center justify-center transition-transform hover:scale-110"
       >
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
@@ -67,46 +72,44 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
         <img 
           src="/logo negro.png" 
           alt="Zampa" 
-          className={`transition-all duration-300 object-contain mix-blend-multiply opacity-90 ${isCollapsed ? 'w-10 h-10' : 'w-20 h-20 mb-3'}`} 
+          className={`transition-all duration-300 object-contain mix-blend-multiply opacity-95 ${isCollapsed ? 'w-10 h-10' : 'w-20 h-20 mb-3'}`} 
         />
-        {!isCollapsed && (
-          <div className="flex flex-col items-center overflow-hidden text-center">
-            <span className="text-base font-bold text-[#3e3a35] tracking-tight leading-none">ZAMPA GESTIÓN</span>
-            <span className="text-[10px] text-[#8b7355] font-bold tracking-widest uppercase mt-1.5">Ovino & Quesería</span>
-          </div>
-        )}
+        <div className={`flex flex-col items-center overflow-hidden text-center transition-all duration-300 origin-top ${isCollapsed ? 'h-0 opacity-0 scale-y-0' : 'h-[30px] opacity-100 scale-y-100'}`}>
+          <span className="text-base font-bold text-[#2b2824] tracking-tight leading-none whitespace-nowrap">ZAMPA GESTIÓN</span>
+          <span className="text-[10px] text-[#8b7355] font-bold tracking-widest uppercase mt-1.5 whitespace-nowrap">Ovino & Quesería</span>
+        </div>
       </div>
       
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar relative z-10">
-        <div onClick={() => setActiveTab('dashboard')} className={navItemClass('dashboard')}>
-          <LayoutDashboard size={18} className={`flex-shrink-0 ${activeTab === 'dashboard' ? 'text-[#3e3a35]' : 'text-[#8b7355] group-hover:text-[#3e3a35]'}`} />
-          {!isCollapsed && <span>Dashboard</span>}
+        <div onClick={() => setActiveTab('dashboard')} className={navItemClass('dashboard')} title="Dashboard">
+          <LayoutDashboard size={18} className={`flex-shrink-0 ${activeTab === 'dashboard' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+          <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Dashboard</span>
         </div>
         
-        <div onClick={() => setActiveTab('queseria')} className={navItemClass('queseria')}>
-          <PackageCheck size={18} className={`flex-shrink-0 ${activeTab === 'queseria' ? 'text-[#3e3a35]' : 'text-[#8b7355] group-hover:text-[#3e3a35]'}`} />
-          {!isCollapsed && <span>Quesería</span>}
+        <div onClick={() => setActiveTab('queseria')} className={navItemClass('queseria')} title="Quesería">
+          <PackageCheck size={18} className={`flex-shrink-0 ${activeTab === 'queseria' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+          <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Quesería</span>
         </div>
         
-        <div onClick={() => setActiveTab('cuentas-corrientes')} className={navItemClass('cuentas-corrientes')}>
-          <WalletCards size={18} className={`flex-shrink-0 ${activeTab === 'cuentas-corrientes' ? 'text-[#3e3a35]' : 'text-[#8b7355] group-hover:text-[#3e3a35]'}`} />
-          {!isCollapsed && <span>Ctas. Corrientes</span>}
+        <div onClick={() => setActiveTab('cuentas-corrientes')} className={navItemClass('cuentas-corrientes')} title="Cuentas Corrientes">
+          <WalletCards size={18} className={`flex-shrink-0 ${activeTab === 'cuentas-corrientes' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+          <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Ctas. Corrientes</span>
         </div>
 
-        <div onClick={() => setActiveTab('cashflow')} className={navItemClass('cashflow')}>
-          <LineChart size={18} className={`flex-shrink-0 ${activeTab === 'cashflow' ? 'text-[#3e3a35]' : 'text-[#8b7355] group-hover:text-[#3e3a35]'}`} />
-          {!isCollapsed && <span>Flujo de Caja</span>}
+        <div onClick={() => setActiveTab('cashflow')} className={navItemClass('cashflow')} title="Flujo de Caja">
+          <LineChart size={18} className={`flex-shrink-0 ${activeTab === 'cashflow' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+          <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Flujo de Caja</span>
         </div>
         
-        <div onClick={() => setActiveTab('transactions')} className={navItemClass('transactions')}>
-          <TableProperties size={18} className={`flex-shrink-0 ${activeTab === 'transactions' ? 'text-[#3e3a35]' : 'text-[#8b7355] group-hover:text-[#3e3a35]'}`} />
-          {!isCollapsed && <span>Base de Datos</span>}
+        <div onClick={() => setActiveTab('transactions')} className={navItemClass('transactions')} title="Base de Datos">
+          <TableProperties size={18} className={`flex-shrink-0 ${activeTab === 'transactions' ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
+          <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Base de Datos</span>
         </div>
       </nav>
 
       {/* Footer Navigation (Settings & Logout) */}
-      <div className="p-3 border-t border-[#e0d6c8]/60 bg-white/10 backdrop-blur-sm relative z-10">
+      <div className="p-3 border-t border-[#e0d6c8]/60 bg-white/30 backdrop-blur-sm relative z-10">
         
         {/* Settings Submenu */}
         <div className="mb-2">
@@ -119,11 +122,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
                 setConfigOpen(!configOpen);
               }
             }}
-            className={`group flex items-center w-full px-3 py-2 text-sm font-medium text-[#6b645c] hover:bg-white/40 hover:text-[#3e3a35] rounded-md transition-all duration-200 cursor-pointer ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+            title="Configuración"
+            className={`group flex items-center w-full px-3 py-2 text-sm font-semibold text-[#4a443c] hover:bg-white/60 hover:text-[#2b2824] rounded-md transition-all duration-200 cursor-pointer overflow-hidden ${isCollapsed ? 'justify-center' : 'justify-between'}`}
           >
-            <div className="flex items-center space-x-3">
-              <Settings size={18} className="flex-shrink-0 text-[#8b7355] group-hover:text-[#3e3a35]" />
-              {!isCollapsed && <span>Configuración</span>}
+            <div className={`flex items-center ${isCollapsed ? '' : 'space-x-3'}`}>
+              <Settings size={18} className="flex-shrink-0 text-[#8b7355] group-hover:text-[#2b2824]" />
+              <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Configuración</span>
             </div>
             {!isCollapsed && (
               <div className="text-[#8b7355]">
@@ -132,24 +136,23 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
             )}
           </div>
           
-          {!isCollapsed && configOpen && (
-            <div className="mt-1 mb-2 space-y-1">
-              <div onClick={() => setActiveTab('listas')} className={navItemClass('listas', true)}>
-                <ListTodo size={16} className={`flex-shrink-0 ${activeTab === 'listas' ? 'text-[#3e3a35]' : 'text-[#8b7355]'}`} />
-                <span>Parámetros</span>
-              </div>
+          <div className={`transition-all duration-300 overflow-hidden ${!isCollapsed && configOpen ? 'max-h-20 opacity-100 mt-1 mb-2' : 'max-h-0 opacity-0 m-0'}`}>
+            <div onClick={() => setActiveTab('listas')} className={navItemClass('listas', true)}>
+              <ListTodo size={16} className={`flex-shrink-0 ${activeTab === 'listas' ? 'text-[#2b2824]' : 'text-[#8b7355]'}`} />
+              <span className="whitespace-nowrap">Parámetros</span>
             </div>
-          )}
+          </div>
         </div>
 
         {/* User Account / Logout */}
-        <div className="pt-2 border-t border-[#e0d6c8]/40 mt-1">
+        <div className="pt-2 border-t border-[#e0d6c8]/50 mt-1">
           <button 
             onClick={handleLogout}
-            className={`group flex items-center w-full px-3 py-2 text-sm font-medium text-[#6b645c] hover:bg-red-50/80 hover:text-red-700 rounded-md transition-all duration-200 ${isCollapsed ? 'justify-center' : 'space-x-3'}`}
+            title="Cerrar Sesión"
+            className={`group flex items-center w-full px-3 py-2 text-sm font-semibold text-[#4a443c] hover:bg-red-50/90 hover:text-red-700 rounded-md transition-all duration-200 overflow-hidden ${isCollapsed ? 'justify-center' : 'space-x-3'}`}
           >
             <LogOut size={18} className="flex-shrink-0 text-[#8b7355] group-hover:text-red-600" />
-            {!isCollapsed && <span>Cerrar Sesión</span>}
+            <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Cerrar Sesión</span>
           </button>
         </div>
 
