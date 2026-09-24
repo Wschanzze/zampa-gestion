@@ -134,12 +134,89 @@ export const useSupabaseTransactions = () => {
     }
   };
 
+  // Register partial/total payment for Cuentas Corrientes
+  const registerPayment = async (payment: {
+    entity: string;
+    amount: number;
+    type: 'COBRO_CLIENTE' | 'PAGO_PROVEEDOR';
+    account: string;
+    date: string;
+    subactividad?: string;
+    notes?: string;
+  }) => {
+    let pgDate = payment.date;
+    if (payment.date.includes('/')) {
+      const [d, m, y] = payment.date.split('/');
+      pgDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    const isCobro = payment.type === 'COBRO_CLIENTE';
+    const subactividad = payment.subactividad || (isCobro ? 'QUESERIA' : 'TAMBO');
+
+    // 1. Real movement in chosen financial account (BANCO, EFECTIVO)
+    const realMovement = {
+      fecha: pgDate,
+      prov_cliente: payment.entity,
+      cuenta: payment.account,
+      ingresos: isCobro ? payment.amount : 0,
+      egresos: isCobro ? 0 : payment.amount,
+      rubro: isCobro ? 'COBRO CUENTA CORRIENTE' : 'PAGO PROVEEDOR',
+      subactividad: subactividad,
+      subrubro_producto: null,
+      pecorino: 0,
+      manchego: 0,
+      saborizado: 0,
+      ahumado: 0,
+      provoleta: 0,
+      ricota: 0,
+      cantidades: 0,
+      observaciones: payment.notes || (isCobro ? 'Cobro parcial a cuenta' : 'Pago parcial a proveedor')
+    };
+
+    // 2. Offsetting entry in PENDIENTE to reduce outstanding debt
+    const pendingOffset = {
+      fecha: pgDate,
+      prov_cliente: payment.entity,
+      cuenta: 'PENDIENTE',
+      ingresos: isCobro ? 0 : payment.amount,
+      egresos: isCobro ? payment.amount : 0,
+      rubro: isCobro ? 'COBRO CUENTA CORRIENTE' : 'PAGO PROVEEDOR',
+      subactividad: subactividad,
+      subrubro_producto: null,
+      pecorino: 0,
+      manchego: 0,
+      saborizado: 0,
+      ahumado: 0,
+      provoleta: 0,
+      ricota: 0,
+      cantidades: 0,
+      observaciones: `Aplicación de pago: ${payment.notes || (isCobro ? 'Cobro parcial' : 'Pago parcial')} (${payment.account})`
+    };
+
+    const { data: insertedRows, error } = await supabase
+      .from('zampa_transacciones')
+      .insert([realMovement, pendingOffset])
+      .select();
+
+    if (error) {
+      console.error('Error registrando pago en Supabase:', error);
+      alert('Error registrando pago: ' + error.message);
+      return false;
+    } else if (insertedRows) {
+      const mapped = insertedRows.map(mapFromSupabase);
+      setData(prev => [...prev, ...mapped]);
+      return true;
+    }
+    return false;
+  };
+
   return { 
     data, 
     loading, 
     addTransaction, 
     updateTransaction, 
     deleteTransaction,
+    registerPayment,
     refreshData: fetchData 
   };
 };

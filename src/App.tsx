@@ -1,21 +1,23 @@
 import { useState } from 'react';
 // @ts-ignore
-import { LayoutDashboard, TableProperties, LineChart } from 'lucide-react';
+import { LayoutDashboard, TableProperties, LineChart, WalletCards } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import CashFlow from './pages/CashFlow';
+import CuentasCorrientes from './pages/CuentasCorrientes';
 
 import { useSupabaseTransactions } from './lib/api';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'cashflow'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'cashflow' | 'cuentas-corrientes'>('dashboard');
   
   const { 
     data, 
     loading, 
     addTransaction: handleAddTransaction, 
     updateTransaction: handleUpdateTransaction, 
-    deleteTransaction: handleDeleteTransaction 
+    deleteTransaction: handleDeleteTransaction,
+    registerPayment 
   } = useSupabaseTransactions();
 
   return (
@@ -47,6 +49,18 @@ function App() {
             <span>Dashboard</span>
           </button>
           
+          <button
+            onClick={() => setActiveTab('cuentas-corrientes')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
+              activeTab === 'cuentas-corrientes' 
+                ? 'bg-white/90 text-[#3e3a35] shadow-sm border border-[#e0d6c8]' 
+                : 'text-[#5c544d] hover:bg-white/50 backdrop-blur-sm'
+            }`}
+          >
+            <WalletCards size={20} />
+            <span>Cuentas Corrientes</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('cashflow')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium ${
@@ -85,6 +99,7 @@ function App() {
           <header className="bg-white/80 backdrop-blur-sm border-b border-[#e0d6c8] px-8 py-4 shadow-sm sticky top-0 z-20">
             <h2 className="text-xl font-semibold text-[#3e3a35]">
               {activeTab === 'dashboard' && 'Resumen por Unidad de Negocio'}
+              {activeTab === 'cuentas-corrientes' && 'Cuentas Corrientes (Deudas y Pagos Parciales)'}
               {activeTab === 'cashflow' && 'Flujo de Caja Mensual'}
               {activeTab === 'transactions' && 'Movimientos (Base de Datos)'}
             </h2>
@@ -97,7 +112,18 @@ function App() {
               </div>
             ) : (
               <>
-                {activeTab === 'dashboard' && <Dashboard data={data} />}
+                {activeTab === 'dashboard' && (
+                  <Dashboard 
+                    data={data} 
+                    onNavigateToCuentas={() => setActiveTab('cuentas-corrientes')} 
+                  />
+                )}
+                {activeTab === 'cuentas-corrientes' && (
+                  <CuentasCorrientes 
+                    data={data} 
+                    onRegisterPayment={registerPayment} 
+                  />
+                )}
                 {activeTab === 'cashflow' && <CashFlow data={data} />}
                 {activeTab === 'transactions' && (
                   <Transactions 

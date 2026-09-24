@@ -4,6 +4,7 @@ import type { Transaction } from '../utils/calculations';
 
 interface DashboardProps {
   data: Transaction[];
+  onNavigateToCuentas?: () => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -14,7 +15,7 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ data }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   const summary = calculateSummaryByUnit(data);
   const pendientes = calculatePendientes(data);
   const units = ['TAMBO', 'RECRIA', 'QUESERIA', 'COMUN'] as const;
@@ -64,8 +65,16 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
 
       {/* Pendientes Table */}
       <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#e0d6c8] bg-[#fdfdfc]">
+        <div className="px-6 py-4 border-b border-[#e0d6c8] bg-[#fdfdfc] flex items-center justify-between">
           <h3 className="text-lg font-semibold text-[#3e3a35]">PENDIENTES DE COBRO Y PAGO</h3>
+          {onNavigateToCuentas && (
+            <button
+              onClick={onNavigateToCuentas}
+              className="text-xs font-bold text-[#8b7355] hover:text-[#705b42] hover:underline"
+            >
+              Gestionar en Cuentas Corrientes →
+            </button>
+          )}
         </div>
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-[#6b645c] bg-[#f4ebd8]/50 border-b border-[#e0d6c8] uppercase">
