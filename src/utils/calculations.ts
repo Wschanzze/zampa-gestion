@@ -1,4 +1,5 @@
 export type Transaction = {
+  id?: string;
   Fecha: string;
   "Prov/Cliente"?: string;
   Cuenta?: string;

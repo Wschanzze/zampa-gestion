@@ -10,7 +10,13 @@ import { useSupabaseTransactions } from './lib/api';
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'cashflow'>('dashboard');
   
-  const { data, loading, addTransaction: handleAddTransaction } = useSupabaseTransactions();
+  const { 
+    data, 
+    loading, 
+    addTransaction: handleAddTransaction, 
+    updateTransaction: handleUpdateTransaction, 
+    deleteTransaction: handleDeleteTransaction 
+  } = useSupabaseTransactions();
 
   return (
     <div className="flex h-screen bg-[#faf9f6]">
@@ -93,7 +99,14 @@ function App() {
               <>
                 {activeTab === 'dashboard' && <Dashboard data={data} />}
                 {activeTab === 'cashflow' && <CashFlow data={data} />}
-                {activeTab === 'transactions' && <Transactions data={data} onAdd={handleAddTransaction} />}
+                {activeTab === 'transactions' && (
+                  <Transactions 
+                    data={data} 
+                    onAdd={handleAddTransaction} 
+                    onUpdate={handleUpdateTransaction}
+                    onDelete={handleDeleteTransaction}
+                  />
+                )}
               </>
             )}
           </div>

@@ -1,101 +1,234 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { parseCurrency } from '../utils/calculations';
 import type { Transaction } from '../utils/calculations';
 import TransactionForm from '../components/TransactionForm';
 // @ts-ignore
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Filter } from 'lucide-react';
 
 interface TransactionsProps {
   data: Transaction[];
-  onAdd: (tx: Transaction) => void;
+  onAdd: (tx: Transaction) => Promise<boolean | void> | void;
+  onUpdate?: (id: string, tx: Transaction) => Promise<boolean | void> | void;
+  onDelete?: (id: string) => Promise<boolean | void> | void;
 }
 
-const Transactions: React.FC<TransactionsProps> = ({ data, onAdd }) => {
-  const [showForm, setShowForm] = useState(false);
+const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDelete }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<Transaction | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterSubactividad, setFilterSubactividad] = useState('TODAS');
+
+  // Filtered list
+  const filteredData = useMemo(() => {
+    return data.filter(item => {
+      const matchSearch = searchTerm === '' || 
+        item['Prov/Cliente']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.Rubro?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item['Subrubro/Producto']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.Fecha?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.Observaciones?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchSub = filterSubactividad === 'TODAS' || 
+        item.Subactividad?.toUpperCase() === filterSubactividad;
+
+      return matchSearch && matchSub;
+    });
+  }, [data, searchTerm, filterSubactividad]);
+
+  const handleEditClick = (item: Transaction) => {
+    setEditingItem(item);
+    setShowModal(true);
+  };
+
+  const handleNewClick = () => {
+    setEditingItem(null);
+    setShowModal(true);
+  };
+
+  const handleDeleteClick = async (item: Transaction) => {
+    if (!item.id) {
+      alert('Esta transacción no tiene ID identificable.');
+      return;
+    }
+    const confirmDelete = window.confirm(
+      `¿Estás seguro de eliminar el movimiento de ${item['Prov/Cliente'] || item.Rubro || 'este registro'} por ${
+        item.Ingresos ? '$' + Number(item.Ingresos).toLocaleString('es-AR') : '$' + Number(item.Egresos).toLocaleString('es-AR')
+      }?`
+    );
+    if (confirmDelete && onDelete) {
+      await onDelete(item.id);
+    }
+  };
 
   return (
-    <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] overflow-hidden">
-      
-      {/* Header action */}
-      <div className="p-4 border-b border-[#e0d6c8] flex justify-between items-center bg-[#fdfdfc]">
-        <h3 className="text-lg font-semibold text-[#3e3a35]">Historial de Movimientos</h3>
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center space-x-1 px-3 py-2 bg-[#8b7355] text-white rounded-lg text-sm hover:bg-[#7a6448] shadow-sm transition-colors font-medium"
-        >
-          <Plus size={16} />
-          <span>Nuevo Movimiento</span>
-        </button>
+    <div className="space-y-4">
+      {/* Header card with action & search */}
+      <div className="bg-white/95 p-4 rounded-xl shadow-sm border border-[#e0d6c8] flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-2.5 text-[#6b645c]" />
+            <input 
+              type="text" 
+              placeholder="Buscar por cliente, rubro, fecha..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-3 py-1.5 border border-[#e0d6c8] rounded-lg text-xs md:text-sm bg-[#faf9f6] text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none w-64 md:w-80"
+            />
+          </div>
+
+          <div className="flex items-center space-x-1">
+            <Filter size={14} className="text-[#6b645c]" />
+            <select
+              value={filterSubactividad}
+              onChange={(e) => setFilterSubactividad(e.target.value)}
+              className="border border-[#e0d6c8] rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#3e3a35] bg-[#faf9f6] focus:ring-1 focus:ring-[#8b7355] outline-none"
+            >
+              <option value="TODAS">Todas las Unidades</option>
+              <option value="TAMBO">TAMBO</option>
+              <option value="RECRIA">RECRÍA</option>
+              <option value="QUESERIA">QUESERÍA</option>
+              <option value="COMUN">COMÚN</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <span className="text-xs text-[#6b645c] font-medium hidden sm:inline">
+            {filteredData.length} {filteredData.length === 1 ? 'movimiento' : 'movimientos'}
+          </span>
+          <button 
+            onClick={handleNewClick}
+            className="flex items-center space-x-1.5 px-4 py-2 bg-[#8b7355] text-white rounded-xl text-xs md:text-sm hover:bg-[#7a6448] shadow-sm transition-colors font-bold"
+          >
+            <Plus size={16} />
+            <span>Nueva Transacción</span>
+          </button>
+        </div>
       </div>
 
-      {showForm && <TransactionForm onAdd={onAdd} onClose={() => setShowForm(false)} />}
+      {/* Modal Dialog */}
+      {showModal && (
+        <TransactionForm 
+          initialData={editingItem}
+          existingData={data}
+          onAdd={onAdd}
+          onUpdate={onUpdate}
+          onClose={() => {
+            setShowModal(false);
+            setEditingItem(null);
+          }} 
+        />
+      )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left">
-          <thead className="text-xs text-[#6b645c] uppercase bg-[#f4ebd8]/50 border-b border-[#e0d6c8]">
-            <tr>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Prov/Cliente</th>
-              <th className="px-4 py-3">Cuenta</th>
-              <th className="px-4 py-3 text-right">Ingresos</th>
-              <th className="px-4 py-3 text-right">Egresos</th>
-              <th className="px-4 py-3">Rubro</th>
-              <th className="px-4 py-3">Subactividad</th>
-              <th className="px-4 py-3">Subrubro/Prod</th>
-              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Pecorino (kg)">Pecorino</th>
-              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Manchego (kg)">Manchego</th>
-              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Saborizado (kg)">Saboriz.</th>
-              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Ahumado (kg)">Ahumado</th>
-              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Provoleta (kg)">Provol.</th>
-              <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Ricota (kg)">Ricota</th>
-              <th className="px-4 py-3 text-right">Cantidades</th>
-              <th className="px-4 py-3">Observaciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, idx) => {
-              const ingresosParsed = parseCurrency(row.Ingresos);
-              const egresosParsed = parseCurrency(row.Egresos);
-              
-              return (
-                <tr key={idx} className="border-b border-[#e0d6c8]/50 hover:bg-[#f4ebd8]/30 transition-colors">
-                  <td className="px-4 py-3 whitespace-nowrap text-[#3e3a35] font-medium">{row.Fecha}</td>
-                  <td className="px-4 py-3 font-medium text-[#3e3a35]">{row['Prov/Cliente']}</td>
-                  <td className="px-4 py-3 text-[#6b645c]">{row.Cuenta}</td>
-                  <td className="px-4 py-3 text-right font-medium text-emerald-600">{ingresosParsed > 0 ? `$${ingresosParsed.toLocaleString('es-AR')}` : '-'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-rose-600">{egresosParsed > 0 ? `$${egresosParsed.toLocaleString('es-AR')}` : '-'}</td>
-                  <td className="px-4 py-3 text-[#3e3a35]">{row.Rubro}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium border
-                      ${row.Subactividad?.toUpperCase() === 'TAMBO' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
-                      ${row.Subactividad?.toUpperCase() === 'QUESERIA' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
-                      ${row.Subactividad?.toUpperCase() === 'RECRIA' ? 'bg-green-50 text-green-700 border-green-200' : ''}
-                      ${row.Subactividad?.toUpperCase() === 'COMUN' ? 'bg-[#f4ebd8] text-[#6b645c] border-[#e0d6c8]' : ''}
-                    `}>
-                      {row.Subactividad || 'COMUN'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[#6b645c]">{row['Subrubro/Producto']}</td>
-                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Pecorino ? Number(row.Pecorino).toLocaleString('es-AR') : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Manchego ? Number(row.Manchego).toLocaleString('es-AR') : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Saborizado ? Number(row.Saborizado).toLocaleString('es-AR') : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Ahumado ? Number(row.Ahumado).toLocaleString('es-AR') : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Provoleta ? Number(row.Provoleta).toLocaleString('es-AR') : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Ricota ? Number(row.Ricota).toLocaleString('es-AR') : '-'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-[#3e3a35]">{row.Cantidades || '-'}</td>
-                  <td className="px-4 py-3 text-xs text-[#6b645c] max-w-[200px] truncate" title={row.Observaciones}>{row.Observaciones || '-'}</td>
-                </tr>
-              );
-            })}
-            {data.length === 0 && (
+      {/* Main Table */}
+      <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm text-left">
+            <thead className="text-xs text-[#6b645c] uppercase bg-[#f4ebd8]/50 border-b border-[#e0d6c8]">
               <tr>
-                <td colSpan={16} className="px-4 py-8 text-center text-[#6b645c]">
-                  No hay transacciones registradas
-                </td>
+                <th className="px-3 py-3 text-center">Acciones</th>
+                <th className="px-4 py-3">Fecha</th>
+                <th className="px-4 py-3">Prov/Cliente</th>
+                <th className="px-4 py-3">Cuenta</th>
+                <th className="px-4 py-3 text-right">Ingresos</th>
+                <th className="px-4 py-3 text-right">Egresos</th>
+                <th className="px-4 py-3">Rubro</th>
+                <th className="px-4 py-3">Subactividad</th>
+                <th className="px-4 py-3">Subrubro/Prod</th>
+                <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Pecorino (kg)">Pecorino</th>
+                <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Manchego (kg)">Manchego</th>
+                <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Saborizado (kg)">Saboriz.</th>
+                <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Ahumado (kg)">Ahumado</th>
+                <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Provoleta (kg)">Provol.</th>
+                <th className="px-3 py-3 text-right bg-amber-50/50 text-amber-900" title="Ricota (kg)">Ricota</th>
+                <th className="px-4 py-3 text-right">Cantidades</th>
+                <th className="px-4 py-3 min-w-[200px]">Observaciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredData.map((row, idx) => {
+                const ingresosParsed = parseCurrency(row.Ingresos);
+                const egresosParsed = parseCurrency(row.Egresos);
+                
+                return (
+                  <tr key={row.id || idx} className="border-b border-[#e0d6c8]/40 hover:bg-[#f4ebd8]/30 transition-colors group">
+                    {/* Action buttons (Edit & Delete) */}
+                    <td className="px-3 py-3 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => handleEditClick(row)}
+                          className="p-1 text-[#6b645c] hover:text-[#8b7355] hover:bg-[#e0d6c8]/40 rounded transition-colors"
+                          title="Editar este movimiento"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(row)}
+                          className="p-1 text-[#6b645c] hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          title="Eliminar este movimiento"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap text-[#3e3a35] font-medium">{row.Fecha}</td>
+                    <td className="px-4 py-3 font-semibold text-[#3e3a35] whitespace-nowrap">{row['Prov/Cliente'] || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        row.Cuenta?.toUpperCase() === 'PENDIENTE' 
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                          : row.Cuenta?.toUpperCase() === 'BANCO'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {row.Cuenta}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-emerald-600 font-mono">
+                      {ingresosParsed > 0 ? `$${ingresosParsed.toLocaleString('es-AR')}` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-rose-600 font-mono">
+                      {egresosParsed > 0 ? `$${egresosParsed.toLocaleString('es-AR')}` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-[#3e3a35] whitespace-nowrap font-medium">{row.Rubro}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border
+                        ${row.Subactividad?.toUpperCase() === 'TAMBO' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
+                        ${row.Subactividad?.toUpperCase() === 'QUESERIA' ? 'bg-amber-50 text-amber-800 border-amber-200' : ''}
+                        ${row.Subactividad?.toUpperCase() === 'RECRIA' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                        ${row.Subactividad?.toUpperCase() === 'COMUN' ? 'bg-[#f4ebd8] text-[#6b645c] border-[#e0d6c8]' : ''}
+                      `}>
+                        {row.Subactividad || 'COMUN'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-[#6b645c] whitespace-nowrap">{row['Subrubro/Producto'] || '-'}</td>
+                    
+                    {/* Cheese weights */}
+                    <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Pecorino ? Number(row.Pecorino).toLocaleString('es-AR') : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Manchego ? Number(row.Manchego).toLocaleString('es-AR') : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Saborizado ? Number(row.Saborizado).toLocaleString('es-AR') : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Ahumado ? Number(row.Ahumado).toLocaleString('es-AR') : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Provoleta ? Number(row.Provoleta).toLocaleString('es-AR') : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs text-amber-950 bg-amber-50/20">{row.Ricota ? Number(row.Ricota).toLocaleString('es-AR') : '-'}</td>
+                    
+                    <td className="px-4 py-3 text-right font-bold text-[#3e3a35] font-mono">{row.Cantidades || '-'}</td>
+                    <td className="px-4 py-3 text-xs text-[#6b645c] max-w-[280px] truncate" title={row.Observaciones}>{row.Observaciones || '-'}</td>
+                  </tr>
+                );
+              })}
+              {filteredData.length === 0 && (
+                <tr>
+                  <td colSpan={17} className="px-4 py-12 text-center text-[#6b645c]">
+                    No se encontraron transacciones que coincidan con la búsqueda.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

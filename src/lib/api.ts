@@ -3,7 +3,8 @@ import { supabase } from './supabase';
 import type { Transaction } from '../utils/calculations';
 
 // Map Supabase snake_case columns to our React component's expected fields
-const mapFromSupabase = (row: any): Transaction => ({
+export const mapFromSupabase = (row: any): Transaction => ({
+  id: row.id,
   Fecha: new Date(row.fecha + 'T12:00:00Z').toLocaleDateString('es-AR'), // Prevent timezone shift
   'Prov/Cliente': row.prov_cliente,
   Cuenta: row.cuenta,
@@ -23,27 +24,30 @@ const mapFromSupabase = (row: any): Transaction => ({
 });
 
 // Map React fields to Supabase snake_case columns
-const mapToSupabase = (tx: Transaction) => {
-  // Convert DD/MM/YYYY to YYYY-MM-DD for PG DATE column
-  const [day, month, year] = tx.Fecha.split('/');
-  const pgDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+export const mapToSupabase = (tx: Transaction) => {
+  // Convert DD/MM/YYYY or YYYY-MM-DD to YYYY-MM-DD for PG DATE column
+  let pgDate = tx.Fecha;
+  if (tx.Fecha && tx.Fecha.includes('/')) {
+    const [day, month, year] = tx.Fecha.split('/');
+    pgDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
 
   return {
     fecha: pgDate,
     prov_cliente: tx['Prov/Cliente'] || null,
     cuenta: tx.Cuenta || null,
-    ingresos: tx.Ingresos || 0,
-    egresos: tx.Egresos || 0,
+    ingresos: Number(tx.Ingresos) || 0,
+    egresos: Number(tx.Egresos) || 0,
     rubro: tx.Rubro || null,
     subactividad: tx.Subactividad || null,
     subrubro_producto: tx['Subrubro/Producto'] || null,
-    pecorino: tx.Pecorino || 0,
-    manchego: tx.Manchego || 0,
-    saborizado: tx.Saborizado || 0,
-    ahumado: tx.Ahumado || 0,
-    provoleta: tx.Provoleta || 0,
-    ricota: tx.Ricota || 0,
-    cantidades: tx.Cantidades || 0,
+    pecorino: Number(tx.Pecorino) || 0,
+    manchego: Number(tx.Manchego) || 0,
+    saborizado: Number(tx.Saborizado) || 0,
+    ahumado: Number(tx.Ahumado) || 0,
+    provoleta: Number(tx.Provoleta) || 0,
+    ricota: Number(tx.Ricota) || 0,
+    cantidades: Number(tx.Cantidades) || 0,
     observaciones: tx.Observaciones || null,
   };
 };
@@ -52,7 +56,7 @@ export const useSupabaseTransactions = () => {
   const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch initial data
+  // Fetch data
   const fetchData = async () => {
     setLoading(true);
     const { data: rows, error } = await supabase
@@ -74,19 +78,68 @@ export const useSupabaseTransactions = () => {
 
   // Add new transaction
   const addTransaction = async (newTx: Transaction) => {
-    // Optimistic update
-    setData(prev => [...prev, newTx]);
-
-    const { error } = await supabase
+    const payload = mapToSupabase(newTx);
+    const { data: inserted, error } = await supabase
       .from('zampa_transacciones')
-      .insert(mapToSupabase(newTx));
+      .insert(payload)
+      .select();
 
     if (error) {
       console.error('Error insertando en Supabase:', error);
-      // Opcional: revertir optimistic update o mostrar alerta
-      fetchData(); // recargar
+      alert('Error al guardar en Supabase: ' + error.message);
+      return false;
+    } else if (inserted && inserted[0]) {
+      const mapped = mapFromSupabase(inserted[0]);
+      setData(prev => [...prev, mapped]);
+      return true;
+    }
+    return false;
+  };
+
+  // Update existing transaction
+  const updateTransaction = async (id: string, updatedTx: Transaction) => {
+    const payload = mapToSupabase(updatedTx);
+    const { data: updatedRows, error } = await supabase
+      .from('zampa_transacciones')
+      .update(payload)
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Error actualizando transacción:', error);
+      alert('Error al actualizar en Supabase: ' + error.message);
+      return false;
+    } else if (updatedRows && updatedRows[0]) {
+      const mapped = mapFromSupabase(updatedRows[0]);
+      setData(prev => prev.map(t => t.id === id ? mapped : t));
+      return true;
+    }
+    return false;
+  };
+
+  // Delete transaction
+  const deleteTransaction = async (id: string) => {
+    const { error } = await supabase
+      .from('zampa_transacciones')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error eliminando transacción:', error);
+      alert('Error al eliminar en Supabase: ' + error.message);
+      return false;
+    } else {
+      setData(prev => prev.filter(t => t.id !== id));
+      return true;
     }
   };
 
-  return { data, loading, addTransaction };
+  return { 
+    data, 
+    loading, 
+    addTransaction, 
+    updateTransaction, 
+    deleteTransaction,
+    refreshData: fetchData 
+  };
 };
