@@ -13,7 +13,8 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Beaker
+  Beaker,
+  Plus
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -21,9 +22,10 @@ interface SidebarProps {
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
   onNavigate?: () => void;
+  onNewTransaction?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, onNavigate }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, onNavigate, onNewTransaction }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -112,8 +114,22 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, onNaviga
         </div>
       </div>
       
+      {/* Quick Action */}
+      {onNewTransaction && (
+        <div className="px-3 pt-4 pb-2 relative z-10 border-b border-[#e0d6c8]/40 mx-2 mb-2">
+          <button 
+            onClick={onNewTransaction}
+            title="Registrar Movimiento"
+            className={`w-full flex items-center justify-center space-x-2 bg-[#8b7355] text-white py-2.5 rounded-xl hover:bg-[#7a6448] shadow-sm transition-all font-bold ${isCollapsed ? 'px-0' : 'px-2'}`}
+          >
+            <Plus size={18} className="flex-shrink-0" />
+            <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>Nuevo Mov.</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar relative z-10">
+      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto custom-scrollbar relative z-10">
         <div onClick={() => handleItemClick('/dashboard')} className={navItemClass('/dashboard')} title="Dashboard">
           <LayoutDashboard size={18} className={`flex-shrink-0 ${isActive('/dashboard') ? 'text-[#2b2824]' : 'text-[#8b7355] group-hover:text-[#2b2824]'}`} />
           <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>Dashboard</span>

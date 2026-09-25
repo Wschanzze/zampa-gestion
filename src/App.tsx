@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 // @ts-ignore
-import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo, Beaker } from 'lucide-react';
+import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo, Beaker, Plus } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import CashFlow from './pages/CashFlow';
@@ -12,6 +12,7 @@ import CargaOperario from './pages/CargaOperario';
 import Listas from './pages/Listas';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
+import TransactionForm from './components/TransactionForm';
 
 import { useSupabaseTransactions } from './lib/api';
 import { supabase } from './lib/supabase';
@@ -21,6 +22,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -167,7 +169,21 @@ function App() {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-2 relative z-10">
+        <nav className="flex-1 px-4 py-4 space-y-2 relative z-10 overflow-y-auto">
+          {/* Quick Action Mobile */}
+          <div className="pb-3 mb-2 border-b border-[#e0d6c8]/40">
+            <button 
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setIsGlobalModalOpen(true);
+              }}
+              className="w-full flex items-center justify-center space-x-2 bg-[#8b7355] text-white px-4 py-3 rounded-xl hover:bg-[#7a6448] shadow-md transition-all font-bold"
+            >
+              <Plus size={20} />
+              <span>Nuevo Movimiento</span>
+            </button>
+          </div>
+
           <button
             onClick={() => handleMobileNav('/dashboard')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${
@@ -260,6 +276,7 @@ function App() {
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         setIsCollapsed={setIsSidebarCollapsed} 
+        onNewTransaction={() => setIsGlobalModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -387,6 +404,23 @@ function App() {
         </button>
       </nav>
 
+      {/* Global Floating Action Button */}
+      <button
+        onClick={() => setIsGlobalModalOpen(true)}
+        className="fixed bottom-20 md:bottom-8 right-5 md:right-8 w-14 h-14 bg-[#8b7355] text-white rounded-full shadow-[0_4px_12px_rgba(139,115,85,0.4)] flex items-center justify-center hover:bg-[#7a6448] hover:scale-105 active:scale-95 transition-all z-[90]"
+        title="Registrar Nuevo Movimiento"
+      >
+        <Plus size={28} />
+      </button>
+
+      {/* Global Transaction Modal */}
+      {isGlobalModalOpen && (
+        <TransactionForm
+          existingData={data}
+          onAdd={handleAddTransaction}
+          onClose={() => setIsGlobalModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

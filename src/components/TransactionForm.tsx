@@ -25,7 +25,7 @@ const TransactionForm: React.FC<Props> = ({
   const [formData, setFormData] = useState<Partial<Transaction>>({
     Fecha: new Date().toLocaleDateString('es-AR'),
     Subactividad: 'TAMBO',
-    Cuenta: 'EFECTIVO',
+    Cuenta: 'BANCO',
     Ingresos: 0,
     Egresos: 0,
     Cantidades: 0,
@@ -171,11 +171,11 @@ const TransactionForm: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-[#faf9f6] rounded-2xl border border-[#e0d6c8] shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-[#faf9f6] rounded-2xl border border-[#e0d6c8] shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden relative">
         
         {/* Modal Header */}
-        <div className="p-5 border-b border-[#e0d6c8] flex justify-between items-center bg-[#f4ebd8]/70">
+        <div className="p-5 border-b border-[#e0d6c8] flex justify-between items-center bg-[#f4ebd8]/70 shrink-0">
           <div>
             <h3 className="text-lg font-bold text-[#3e3a35]">
               {isEditing ? 'Editar Transacción' : 'Nueva Transacción'}
@@ -194,9 +194,10 @@ const TransactionForm: React.FC<Props> = ({
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
-          
-          {/* Tipo de Movimiento Selector */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="p-6 overflow-y-auto space-y-5 flex-1 custom-scrollbar">
+            
+            {/* Tipo de Movimiento Selector */}
           <div className="flex p-1 bg-[#eae0cd]/60 rounded-xl max-w-sm border border-[#e0d6c8]">
             <button
               type="button"
@@ -485,12 +486,13 @@ const TransactionForm: React.FC<Props> = ({
             />
           </div>
 
+          </div>
           {/* Actions */}
-          <div className="pt-3 border-t border-[#e0d6c8] flex justify-end space-x-3">
+          <div className="p-4 border-t border-[#e0d6c8] bg-[#faf9f6] flex justify-end space-x-3 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-4 py-2 border border-[#e0d6c8] text-[#6b645c] rounded-xl text-sm hover:bg-[#f4ebd8] font-semibold transition-colors"
+              className="px-4 py-2 border border-[#e0d6c8] text-[#6b645c] rounded-xl text-sm hover:bg-[#f4ebd8] font-semibold transition-colors bg-white"
             >
               Cancelar
             </button>
@@ -501,7 +503,6 @@ const TransactionForm: React.FC<Props> = ({
               <span>{isEditing ? 'Guardar Cambios' : 'Registrar Movimiento'}</span>
             </button>
           </div>
-
         </form>
       </div>
     </div>

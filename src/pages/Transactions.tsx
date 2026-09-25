@@ -40,18 +40,13 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
     setShowModal(true);
   };
 
-  const handleNewClick = () => {
-    setEditingItem(null);
-    setShowModal(true);
-  };
-
   const handleDeleteClick = async (item: Transaction) => {
     if (!item.id) {
-      alert('Esta transacción no tiene ID identificable.');
+      alert('Esta transacciﾃｳn no tiene ID identificable.');
       return;
     }
     const confirmDelete = window.confirm(
-      `¿Estás seguro de eliminar el movimiento de ${item['Prov/Cliente'] || item.Rubro || 'este registro'} por ${
+      `ﾂｿEstﾃ｡s seguro de eliminar el movimiento de ${item['Prov/Cliente'] || item.Rubro || 'este registro'} por ${
         item.Ingresos ? '$' + Number(item.Ingresos).toLocaleString('es-AR') : '$' + Number(item.Egresos).toLocaleString('es-AR')
       }?`
     );
@@ -85,9 +80,9 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
             >
               <option value="TODAS">Todas las Unidades</option>
               <option value="TAMBO">TAMBO</option>
-              <option value="RECRIA">RECRÍA</option>
-              <option value="QUESERIA">QUESERÍA</option>
-              <option value="COMUN">COMÚN</option>
+              <option value="RECRIA">RECRﾃ喉</option>
+              <option value="QUESERIA">QUESERﾃ喉</option>
+              <option value="COMUN">COMﾃ哢</option>
             </select>
           </div>
         </div>
@@ -96,19 +91,12 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
           <span className="text-xs text-[#6b645c] font-medium">
             {filteredData.length} {filteredData.length === 1 ? 'movimiento' : 'movimientos'}
           </span>
-          <button 
-            onClick={handleNewClick}
-            className="flex items-center space-x-1.5 px-3.5 py-2 bg-[#8b7355] text-white rounded-xl text-xs md:text-sm hover:bg-[#7a6448] shadow-sm transition-colors font-bold"
-          >
-            <Plus size={16} />
-            <span>Nueva Transacción</span>
-          </button>
         </div>
       </div>
 
       {/* Mobile scroll hint */}
       <div className="sm:hidden text-[11px] text-[#8b7355] bg-[#f4ebd8]/70 px-3 py-1.5 rounded-lg border border-[#e0d6c8] text-center font-medium">
-        ↔ Desliza hacia los lados para ver todas las columnas y quesos
+        竊・Desliza hacia los lados para ver todas las columnas y quesos
       </div>
 
       {/* Modal Dialog */}
@@ -230,7 +218,7 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
               {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={17} className="px-4 py-12 text-center text-[#6b645c]">
-                    No se encontraron transacciones que coincidan con la búsqueda.
+                    No se encontraron transacciones que coincidan con la bﾃｺsqueda.
                   </td>
                 </tr>
               )}
