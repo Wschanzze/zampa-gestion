@@ -355,9 +355,9 @@ const Listas = () => {
         </div>
 
         {/* Items Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-xs sm:text-sm text-left">
-            <thead className="text-[11px] text-[#6b645c] uppercase bg-[#f4ebd8]/40 border-b border-[#e0d6c8]">
+            <thead className="text-[11px] text-[#6b645c] uppercase bg-[#f4ebd8] border-b border-[#e0d6c8] sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 sm:px-6 py-3 font-semibold w-16 text-center">#</th>
                 <th className="px-4 sm:px-6 py-3 font-semibold">Nombre del Registro</th>

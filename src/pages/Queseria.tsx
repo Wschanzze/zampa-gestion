@@ -229,11 +229,11 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-xs sm:text-sm text-left border-collapse">
-            <thead className="text-[11px] sm:text-xs text-[#6b645c] uppercase bg-[#f4ebd8]/50 border-b border-[#e0d6c8]">
+            <thead className="text-[11px] sm:text-xs text-[#6b645c] uppercase bg-[#f4ebd8] border-b border-[#e0d6c8] sticky top-0 z-30 shadow-sm">
               <tr>
-                <th className="sticky left-0 bg-[#f4ebd8] z-20 px-3 sm:px-4 py-2.5 sm:py-3 font-semibold border-r border-[#e0d6c8]/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[70px]">
+                <th className="sticky left-0 bg-[#f4ebd8] z-40 px-3 sm:px-4 py-2.5 sm:py-3 font-semibold border-r border-[#e0d6c8]/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[70px]">
                   MES
                 </th>
                 <th className="px-3 sm:px-4 py-2.5 sm:py-3 text-right bg-amber-50/50 text-amber-950 font-semibold min-w-[85px]">Pecorino (kg)</th>

@@ -321,9 +321,9 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
 
       {/* Main Entities Table */}
       <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-xs md:text-sm text-left">
-            <thead className="text-xs text-[#6b645c] uppercase bg-[#f4ebd8]/50 border-b border-[#e0d6c8]">
+            <thead className="text-xs text-[#6b645c] uppercase bg-[#f4ebd8] border-b border-[#e0d6c8] sticky top-0 z-30 shadow-sm">
               <tr>
                 <th className="px-4 py-3">Cliente / Proveedor</th>
                 <th className="px-4 py-3">Tipo</th>

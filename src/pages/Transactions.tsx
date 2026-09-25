@@ -127,12 +127,12 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
 
       {/* Main Table */}
       <div className="bg-white/95 rounded-xl shadow-sm border border-[#e0d6c8] overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-240px)]">
           <table className="w-full text-xs md:text-sm text-left border-collapse">
-            <thead className="text-[11px] sm:text-xs text-[#6b645c] uppercase bg-[#f4ebd8]/50 border-b border-[#e0d6c8]">
+            <thead className="text-[11px] sm:text-xs text-[#6b645c] uppercase bg-[#f4ebd8] border-b border-[#e0d6c8] sticky top-0 z-30 shadow-sm">
               <tr>
                 {/* Sticky action header */}
-                <th className="sticky left-0 bg-[#f4ebd8] z-20 px-2 sm:px-3 py-2.5 sm:py-3 text-center border-r border-[#e0d6c8]/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[70px]">
+                <th className="sticky left-0 bg-[#f4ebd8] z-40 px-2 sm:px-3 py-2.5 sm:py-3 text-center border-r border-[#e0d6c8]/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[70px]">
                   Acciones
                 </th>
                 <th className="px-3 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap">Fecha</th>
