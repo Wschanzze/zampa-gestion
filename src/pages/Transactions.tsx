@@ -3,7 +3,7 @@ import { parseCurrency } from '../utils/calculations';
 import type { Transaction } from '../utils/calculations';
 import TransactionForm from '../components/TransactionForm';
 // @ts-ignore
-import { Plus, Pencil, Trash2, Search, Filter } from 'lucide-react';
+import { Pencil, Trash2, Search, Filter, ArrowUpDown } from 'lucide-react';
 
 interface TransactionsProps {
   data: Transaction[];
@@ -12,15 +12,32 @@ interface TransactionsProps {
   onDelete?: (id: string) => Promise<boolean | void> | void;
 }
 
+// Robust date parser for es-AR "D/M/YYYY" or ISO formats
+const parseFechaToTime = (fechaStr?: string): number => {
+  if (!fechaStr) return 0;
+  if (fechaStr.includes('/')) {
+    const parts = fechaStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10) || 0;
+      const month = (parseInt(parts[1], 10) || 1) - 1;
+      const year = parseInt(parts[2], 10) || 0;
+      return new Date(year, month, day).getTime();
+    }
+  }
+  const t = new Date(fechaStr).getTime();
+  return isNaN(t) ? 0 : t;
+};
+
 const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDelete }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSubactividad, setFilterSubactividad] = useState('TODAS');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
-  // Filtered list
+  // Filtered and sorted list (latest entries first by default)
   const filteredData = useMemo(() => {
-    return data.filter(item => {
+    const list = data.filter(item => {
       const matchSearch = searchTerm === '' || 
         item['Prov/Cliente']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.Rubro?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -33,7 +50,16 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
 
       return matchSearch && matchSub;
     });
-  }, [data, searchTerm, filterSubactividad]);
+
+    return [...list].sort((a, b) => {
+      const timeA = parseFechaToTime(a.Fecha);
+      const timeB = parseFechaToTime(b.Fecha);
+      if (timeA !== timeB) {
+        return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+      }
+      return 0;
+    });
+  }, [data, searchTerm, filterSubactividad, sortOrder]);
 
   const handleEditClick = (item: Transaction) => {
     setEditingItem(item);
@@ -42,11 +68,11 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
 
   const handleDeleteClick = async (item: Transaction) => {
     if (!item.id) {
-      alert('Esta transacciﾃｳn no tiene ID identificable.');
+      alert('Esta transacción no tiene ID identificable.');
       return;
     }
     const confirmDelete = window.confirm(
-      `ﾂｿEstﾃ｡s seguro de eliminar el movimiento de ${item['Prov/Cliente'] || item.Rubro || 'este registro'} por ${
+      `¿Estás seguro de eliminar el movimiento de ${item['Prov/Cliente'] || item.Rubro || 'este registro'} por ${
         item.Ingresos ? '$' + Number(item.Ingresos).toLocaleString('es-AR') : '$' + Number(item.Egresos).toLocaleString('es-AR')
       }?`
     );
@@ -57,7 +83,7 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
 
   return (
     <div className="space-y-4">
-      {/* Header card with action & search */}
+      {/* Header card with search & filters */}
       <div className="bg-white/95 p-3.5 sm:p-4 rounded-xl shadow-sm border border-[#e0d6c8] flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
           <div className="relative flex-1 sm:w-64 md:w-80">
@@ -80,9 +106,9 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
             >
               <option value="TODAS">Todas las Unidades</option>
               <option value="TAMBO">TAMBO</option>
-              <option value="RECRIA">RECRﾃ喉</option>
-              <option value="QUESERIA">QUESERﾃ喉</option>
-              <option value="COMUN">COMﾃ哢</option>
+              <option value="RECRIA">RECRÍA</option>
+              <option value="QUESERIA">QUESERÍA</option>
+              <option value="COMUN">COMÚN</option>
             </select>
           </div>
         </div>
@@ -91,15 +117,18 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
           <span className="text-xs text-[#6b645c] font-medium">
             {filteredData.length} {filteredData.length === 1 ? 'movimiento' : 'movimientos'}
           </span>
+          <span className="text-xs text-[#8b7355] font-semibold bg-[#f4ebd8]/70 px-2.5 py-1 rounded-md border border-[#e0d6c8]/60 hidden sm:inline">
+            Orden: {sortOrder === 'desc' ? 'Más recientes primero' : 'Más antiguas primero'}
+          </span>
         </div>
       </div>
 
       {/* Mobile scroll hint */}
-      <div className="sm:hidden text-[11px] text-[#8b7355] bg-[#f4ebd8]/70 px-3 py-1.5 rounded-lg border border-[#e0d6c8] text-center font-medium">
-        竊・Desliza hacia los lados para ver todas las columnas y quesos
+      <div className="sm:hidden text-xs text-[#8b7355] bg-[#f4ebd8]/70 px-3 py-1.5 rounded-lg border border-[#e0d6c8] text-center font-medium flex items-center justify-center space-x-1">
+        <span>↔ Desliza hacia los lados para ver todas las columnas y quesos</span>
       </div>
 
-      {/* Modal Dialog */}
+      {/* Modal Dialog for Editing */}
       {showModal && (
         <TransactionForm 
           initialData={editingItem}
@@ -123,7 +152,19 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
                 <th className="sticky left-0 bg-[#f4ebd8] z-40 px-2 sm:px-3 py-2.5 sm:py-3 text-center border-r border-[#e0d6c8]/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[70px]">
                   Acciones
                 </th>
-                <th className="px-3 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap">Fecha</th>
+                <th 
+                  onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                  className="px-3 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap cursor-pointer hover:bg-[#eae0cd] transition-colors select-none group"
+                  title="Clic para cambiar orden por fecha"
+                >
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-bold text-[#3e3a35]">Fecha</span>
+                    <ArrowUpDown size={14} className="text-[#8b7355] group-hover:text-[#2d2a26]" />
+                    <span className="text-[10px] text-[#8b7355] font-bold normal-case tracking-normal">
+                      {sortOrder === 'desc' ? '↓ Recientes' : '↑ Antiguas'}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-3 sm:px-4 py-2.5 sm:py-3">Prov/Cliente</th>
                 <th className="px-3 sm:px-4 py-2.5 sm:py-3">Cuenta</th>
                 <th className="px-3 sm:px-4 py-2.5 sm:py-3 text-right">Ingresos</th>
@@ -218,7 +259,7 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
               {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={17} className="px-4 py-12 text-center text-[#6b645c]">
-                    No se encontraron transacciones que coincidan con la bﾃｺsqueda.
+                    No se encontraron transacciones que coincidan con la búsqueda.
                   </td>
                 </tr>
               )}

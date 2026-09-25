@@ -62,7 +62,7 @@ export const useSupabaseTransactions = () => {
     const { data: rows, error } = await supabase
       .from('zampa_transacciones')
       .select('*')
-      .order('fecha', { ascending: true });
+      .order('fecha', { ascending: false });
 
     if (error) {
       console.error('Error fetching data:', error);
@@ -90,7 +90,7 @@ export const useSupabaseTransactions = () => {
       return false;
     } else if (inserted && inserted[0]) {
       const mapped = mapFromSupabase(inserted[0]);
-      setData(prev => [...prev, mapped]);
+      setData(prev => [mapped, ...prev]);
       return true;
     }
     return false;
@@ -106,7 +106,7 @@ export const useSupabaseTransactions = () => {
       .select();
 
     if (error) {
-      console.error('Error actualizando transacción:', error);
+      console.error('Error actualizando transacciﾃｳn:', error);
       alert('Error al actualizar en Supabase: ' + error.message);
       return false;
     } else if (updatedRows && updatedRows[0]) {
@@ -125,7 +125,7 @@ export const useSupabaseTransactions = () => {
       .eq('id', id);
 
     if (error) {
-      console.error('Error eliminando transacción:', error);
+      console.error('Error eliminando transacciﾃｳn:', error);
       alert('Error al eliminar en Supabase: ' + error.message);
       return false;
     } else {
@@ -190,7 +190,7 @@ export const useSupabaseTransactions = () => {
       provoleta: 0,
       ricota: 0,
       cantidades: 0,
-      observaciones: `Aplicación de pago: ${payment.notes || (isCobro ? 'Cobro parcial' : 'Pago parcial')} (${payment.account})`
+      observaciones: `Aplicaciﾃｳn de pago: ${payment.notes || (isCobro ? 'Cobro parcial' : 'Pago parcial')} (${payment.account})`
     };
 
     const { data: insertedRows, error } = await supabase
