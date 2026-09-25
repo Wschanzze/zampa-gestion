@@ -298,8 +298,8 @@ function App() {
             </span>
           </header>
           
-          {/* Content Body with extra bottom padding on mobile for bottom bar */}
-          <div className="p-3 sm:p-5 md:p-8 pb-20 md:pb-8 flex-1">
+          {/* Content Body */}
+          <div className="p-3 sm:p-5 md:p-8 pb-8 flex-1">
             {loading ? (
               <div className="flex flex-col items-center justify-center h-64 text-[#6b645c] space-y-2">
                 <div className="w-8 h-8 border-3 border-[#8b7355] border-t-transparent rounded-full animate-spin"></div>
@@ -351,63 +351,10 @@ function App() {
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#e0d6c8] z-30 flex items-center justify-around py-1.5 px-1 shadow-lg">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            isCurrent('/dashboard') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
-          }`}
-        >
-          <LayoutDashboard size={18} />
-          <span className="text-[9px] mt-0.5 font-medium">Dashboard</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/queseria')}
-          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            isCurrent('/queseria') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
-          }`}
-        >
-          <PackageCheck size={18} />
-          <span className="text-[9px] mt-0.5 font-medium">Quesería</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/cuentas-corrientes')}
-          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            isCurrent('/cuentas-corrientes') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
-          }`}
-        >
-          <WalletCards size={18} />
-          <span className="text-[9px] mt-0.5 font-medium">Ctas. Ctes.</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/flujo-caja')}
-          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            isCurrent('/flujo-caja') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
-          }`}
-        >
-          <LineChart size={18} />
-          <span className="text-[9px] mt-0.5 font-medium">Flujo Caja</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/datos')}
-          className={`flex flex-col items-center py-1 px-1.5 rounded-lg transition-colors ${
-            isCurrent('/datos') ? 'text-[#8b7355] font-bold' : 'text-[#6b645c]'
-          }`}
-        >
-          <TableProperties size={18} />
-          <span className="text-[9px] mt-0.5 font-medium">Base Datos</span>
-        </button>
-      </nav>
-
       {/* Global Floating Action Button */}
       <button
         onClick={() => setIsGlobalModalOpen(true)}
-        className="fixed bottom-20 md:bottom-8 right-5 md:right-8 w-14 h-14 bg-[#8b7355] text-white rounded-full shadow-[0_4px_12px_rgba(139,115,85,0.4)] flex items-center justify-center hover:bg-[#7a6448] hover:scale-105 active:scale-95 transition-all z-[90]"
+        className="fixed bottom-6 md:bottom-8 right-5 md:right-8 w-14 h-14 bg-[#8b7355] text-white rounded-full shadow-[0_4px_12px_rgba(139,115,85,0.4)] flex items-center justify-center hover:bg-[#7a6448] hover:scale-105 active:scale-95 transition-all z-[90]"
         title="Registrar Nuevo Movimiento"
       >
         <Plus size={28} />
