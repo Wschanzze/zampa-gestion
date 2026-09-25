@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Transaction } from '../utils/calculations';
 import { useListas } from '../lib/api';
+import ComboboxSelect from './ComboboxSelect';
 // @ts-ignore
 import { X, Sparkles, Calculator } from 'lucide-react';
 
@@ -41,11 +42,21 @@ const TransactionForm: React.FC<Props> = ({
 
   // Autocomplete options derived dynamically from existing database + Listas
   const autocompleteLists = useMemo(() => {
-    const provs = new Set<string>(entidades.map(e => e.nombre));
-    const rubs = new Set<string>(rubros.map(r => r.nombre));
-    const subrubs = new Set<string>(subrubros.map(s => s.nombre));
-    const cuents = new Set<string>(cuentas.map(c => c.nombre));
-    const unids = new Set<string>(unidades.map(u => u.nombre));
+    const provs = new Set<string>(entidades.map(e => e.nombre?.trim()).filter(Boolean));
+    const rubs = new Set<string>(rubros.map(r => r.nombre?.trim()).filter(Boolean));
+    const subrubs = new Set<string>(subrubros.map(s => s.nombre?.trim()).filter(Boolean));
+    const cuents = new Set<string>(cuentas.map(c => c.nombre?.trim()).filter(Boolean));
+    const unids = new Set<string>(unidades.map(u => u.nombre?.trim()).filter(Boolean));
+
+    // Fallbacks if database lists are empty or loading
+    if (cuents.size === 0) {
+      cuents.add('BANCO');
+      cuents.add('EFECTIVO');
+      cuents.add('PENDIENTE');
+    }
+    if (unids.size === 0) {
+      ['TAMBO', 'RECRÍA', 'QUESERÍA', 'COMÚN'].forEach(u => unids.add(u));
+    }
 
     // Also include existing data just in case there are legacy items
     existingData.forEach(item => {
@@ -56,12 +67,14 @@ const TransactionForm: React.FC<Props> = ({
       if (item.Subactividad) unids.add(item.Subactividad.trim());
     });
 
+    const sortFn = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
+
     return {
-      proveedores: Array.from(provs).sort(),
-      rubros: Array.from(rubs).sort(),
-      subrubros: Array.from(subrubs).sort(),
-      cuentas: Array.from(cuents).sort(),
-      unidades: Array.from(unids).sort(),
+      proveedores: Array.from(provs).sort(sortFn),
+      rubros: Array.from(rubs).sort(sortFn),
+      subrubros: Array.from(subrubs).sort(sortFn),
+      cuentas: Array.from(cuents).sort(sortFn),
+      unidades: Array.from(unids).sort(sortFn),
     };
   }, [existingData, entidades, rubros, subrubros, cuentas, unidades]);
 
@@ -229,23 +242,14 @@ const TransactionForm: React.FC<Props> = ({
             </button>
           </div>
 
-          {/* Datalists for autocompletion */}
-          <datalist id="lista-proveedores">
-            {autocompleteLists.proveedores.map(p => <option key={p} value={p} />)}
-          </datalist>
-          <datalist id="lista-rubros">
-            {autocompleteLists.rubros.map(r => <option key={r} value={r} />)}
-          </datalist>
-          <datalist id="lista-subrubros">
-            {autocompleteLists.subrubros.map(s => <option key={s} value={s} />)}
-          </datalist>
-
           {/* Grid de campos principales */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             {/* Fecha */}
             <div>
-              <label className="block text-xs font-semibold text-[#6b645c] mb-1">Fecha (D/M/AAAA)</label>
+              <label className="block text-xs font-semibold text-[#6b645c] mb-1">
+                Fecha (D/M/AAAA) <span className="text-rose-600">*</span>
+              </label>
               <input 
                 required 
                 type="text" 
@@ -253,84 +257,59 @@ const TransactionForm: React.FC<Props> = ({
                 placeholder="22/9/2026" 
                 value={formData.Fecha || ''} 
                 onChange={handleChange} 
-                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
+                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2.5 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] focus:border-[#8b7355] outline-none font-medium" 
               />
             </div>
 
-            {/* Proveedor / Cliente con autocompletado */}
-            <div>
-              <label className="block text-xs font-semibold text-[#6b645c] mb-1">
-                Proveedor / Cliente
-              </label>
-              <input 
-                type="text" 
-                name="Prov/Cliente" 
-                list="lista-proveedores"
-                placeholder="Escribe o selecciona..." 
-                value={formData['Prov/Cliente'] || ''} 
-                onChange={handleChange} 
-                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
-              />
-            </div>
+            {/* Proveedor / Cliente con ComboboxSelect */}
+            <ComboboxSelect
+              label="Proveedor / Cliente"
+              name="Prov/Cliente"
+              placeholder="Selecciona o escribe..."
+              value={formData['Prov/Cliente'] || ''}
+              onChange={(val) => setFormData(prev => ({ ...prev, 'Prov/Cliente': val }))}
+              options={autocompleteLists.proveedores}
+            />
 
             {/* Cuenta */}
-            <div>
-              <label className="block text-xs font-semibold text-[#6b645c] mb-1">Cuenta</label>
-              <select 
-                name="Cuenta" 
-                value={formData.Cuenta || ''} 
-                onChange={handleChange} 
-                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-medium"
-              >
-                {autocompleteLists.cuentas.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
+            <ComboboxSelect
+              label="Cuenta"
+              name="Cuenta"
+              placeholder="Selecciona cuenta..."
+              value={formData.Cuenta || ''}
+              onChange={(val) => setFormData(prev => ({ ...prev, Cuenta: val }))}
+              options={autocompleteLists.cuentas}
+            />
 
             {/* Unidad de Negocio */}
-            <div>
-              <label className="block text-xs font-semibold text-[#6b645c] mb-1">Unidad de Negocio</label>
-              <select 
-                name="Subactividad" 
-                value={formData.Subactividad || ''} 
-                onChange={handleChange} 
-                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-medium"
-              >
-                <option value="">Seleccione...</option>
-                {autocompleteLists.unidades.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
+            <ComboboxSelect
+              label="Unidad de Negocio"
+              name="Subactividad"
+              placeholder="Selecciona unidad..."
+              value={formData.Subactividad || ''}
+              onChange={(val) => setFormData(prev => ({ ...prev, Subactividad: val }))}
+              options={autocompleteLists.unidades}
+            />
 
             {/* Rubro */}
-            <div>
-              <label className="block text-xs font-semibold text-[#6b645c] mb-1">Rubro</label>
-              <input 
-                type="text" 
-                name="Rubro" 
-                list="lista-rubros"
-                placeholder="Ej. VENTA QUESO, ALIMENTACION" 
-                value={formData.Rubro || ''} 
-                onChange={handleChange} 
-                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
-              />
-            </div>
+            <ComboboxSelect
+              label="Rubro"
+              name="Rubro"
+              placeholder="Ej. VENTA QUESO, ALIMENTACION"
+              value={formData.Rubro || ''}
+              onChange={(val) => setFormData(prev => ({ ...prev, Rubro: val }))}
+              options={autocompleteLists.rubros}
+            />
 
             {/* Subrubro / Producto */}
-            <div>
-              <label className="block text-xs font-semibold text-[#6b645c] mb-1">Subrubro / Producto</label>
-              <input 
-                type="text" 
-                name="Subrubro/Producto" 
-                list="lista-subrubros"
-                placeholder="Ej. Cuajo, Balanceado..." 
-                value={formData['Subrubro/Producto'] || ''} 
-                onChange={handleChange} 
-                className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
-              />
-            </div>
+            <ComboboxSelect
+              label="Subrubro / Producto"
+              name="Subrubro/Producto"
+              placeholder="Ej. Cuajo, Balanceado..."
+              value={formData['Subrubro/Producto'] || ''}
+              onChange={(val) => setFormData(prev => ({ ...prev, 'Subrubro/Producto': val }))}
+              options={autocompleteLists.subrubros}
+            />
 
             {/* Monto */}
             <div>
@@ -340,10 +319,11 @@ const TransactionForm: React.FC<Props> = ({
               <input 
                 type="number" 
                 step="0.01" 
+                inputMode="decimal"
                 placeholder="0.00"
                 value={(tipoMovimiento === 'INGRESO' ? formData.Ingresos : formData.Egresos) || ''} 
                 onChange={handleMontoChange} 
-                className={`w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm font-bold outline-none focus:ring-1 ${
+                className={`w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2.5 text-base md:text-sm font-bold outline-none focus:ring-1 ${
                   tipoMovimiento === 'INGRESO' ? 'text-emerald-700 focus:ring-emerald-500' : 'text-rose-700 focus:ring-rose-500'
                 }`} 
               />
@@ -364,16 +344,16 @@ const TransactionForm: React.FC<Props> = ({
               <input 
                 type="number" 
                 step="0.01" 
+                inputMode="decimal"
                 name="Cantidades" 
                 placeholder="0.00"
                 value={formData.Cantidades || ''} 
                 onChange={handleChange} 
-                className={`w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-bold ${
+                className={`w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2.5 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-bold ${
                   totalKgQuesos > 0 ? 'bg-amber-50/40 border-amber-300 text-amber-950' : ''
                 }`} 
               />
             </div>
-
           </div>
 
           {/* Sección de Quesos (Kg) */}
@@ -398,11 +378,12 @@ const TransactionForm: React.FC<Props> = ({
                 <input 
                   type="number" 
                   step="0.01" 
+                  inputMode="decimal"
                   name="Pecorino" 
                   placeholder="0.00"
                   value={formData.Pecorino || ''} 
                   onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-1.5 text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
+                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
                 />
               </div>
 
@@ -411,11 +392,12 @@ const TransactionForm: React.FC<Props> = ({
                 <input 
                   type="number" 
                   step="0.01" 
+                  inputMode="decimal"
                   name="Manchego" 
                   placeholder="0.00"
                   value={formData.Manchego || ''} 
                   onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-1.5 text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
+                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
                 />
               </div>
 
@@ -424,11 +406,12 @@ const TransactionForm: React.FC<Props> = ({
                 <input 
                   type="number" 
                   step="0.01" 
+                  inputMode="decimal"
                   name="Saborizado" 
                   placeholder="0.00"
                   value={formData.Saborizado || ''} 
                   onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-1.5 text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
+                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
                 />
               </div>
 
@@ -437,11 +420,12 @@ const TransactionForm: React.FC<Props> = ({
                 <input 
                   type="number" 
                   step="0.01" 
+                  inputMode="decimal"
                   name="Ahumado" 
                   placeholder="0.00"
                   value={formData.Ahumado || ''} 
                   onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-1.5 text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
+                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
                 />
               </div>
 
@@ -450,11 +434,12 @@ const TransactionForm: React.FC<Props> = ({
                 <input 
                   type="number" 
                   step="0.01" 
+                  inputMode="decimal"
                   name="Provoleta" 
                   placeholder="0.00"
                   value={formData.Provoleta || ''} 
                   onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-1.5 text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
+                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
                 />
               </div>
 
@@ -463,11 +448,12 @@ const TransactionForm: React.FC<Props> = ({
                 <input 
                   type="number" 
                   step="0.01" 
+                  inputMode="decimal"
                   name="Ricota" 
                   placeholder="0.00"
                   value={formData.Ricota || ''} 
                   onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-1.5 text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
+                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
                 />
               </div>
             </div>
@@ -482,7 +468,7 @@ const TransactionForm: React.FC<Props> = ({
               placeholder="Ej. Fc 1027-00050711 - Caravanas electrónicas Datamars..." 
               value={formData.Observaciones || ''} 
               onChange={handleChange} 
-              className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
+              className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2.5 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
             />
           </div>
 

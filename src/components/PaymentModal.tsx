@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ComboboxSelect from './ComboboxSelect';
 // @ts-ignore
 import { X, CheckCircle, ArrowDownLeft, ArrowUpRight, DollarSign } from 'lucide-react';
 
@@ -150,25 +151,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
 
           {/* Entity (Client/Supplier) */}
-          <div>
-            <label className="block text-xs font-semibold text-[#6b645c] mb-1">
-              {type === 'COBRO_CLIENTE' ? 'Cliente que paga' : 'Proveedor al que se paga'}
-            </label>
-            <input 
-              required
-              type="text"
-              list="entities-datalist"
-              placeholder="Escribe o selecciona cliente/proveedor..."
-              value={entity}
-              onChange={(e) => setEntity(e.target.value)}
-              className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-medium"
-            />
-            <datalist id="entities-datalist">
-              {availableEntities.map(e => (
-                <option key={e.name} value={e.name} />
-              ))}
-            </datalist>
-          </div>
+          <ComboboxSelect
+            label={type === 'COBRO_CLIENTE' ? 'Cliente que paga' : 'Proveedor al que se paga'}
+            name="entity"
+            required
+            placeholder="Selecciona o escribe cliente/proveedor..."
+            value={entity}
+            onChange={(val) => setEntity(val)}
+            options={availableEntities.map(e => e.name)}
+          />
 
           {/* Pending Debt Alert / Card */}
           {entity && (
