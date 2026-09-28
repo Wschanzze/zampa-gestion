@@ -76,6 +76,29 @@ export const useSupabaseTransactions = () => {
     fetchData();
   }, []);
 
+  // Auto-sync lists dynamically when a new manually typed string is used
+  const syncListsWithSupabase = async (tx: Transaction) => {
+    if (tx['Prov/Cliente']?.trim()) {
+      const isCliente = Number(tx.Ingresos) > 0 || tx.Rubro?.toUpperCase().includes('VENTA');
+      const isProveedor = Number(tx.Egresos) > 0 || tx.Rubro?.toUpperCase().includes('COMPRA') || tx.Rubro?.toUpperCase().includes('GASTO');
+      const tipo = isCliente && isProveedor ? 'AMBOS' : isCliente ? 'CLIENTE' : isProveedor ? 'PROVEEDOR' : 'AMBOS';
+      
+      supabase.from('zampa_entidades').insert({ nombre: tx['Prov/Cliente'].trim(), tipo }).then(() => {});
+    }
+    if (tx.Cuenta?.trim()) {
+      supabase.from('zampa_cuentas').insert({ nombre: tx.Cuenta.trim() }).then(() => {});
+    }
+    if (tx.Rubro?.trim()) {
+      supabase.from('zampa_rubros').insert({ nombre: tx.Rubro.trim() }).then(() => {});
+    }
+    if (tx['Subrubro/Producto']?.trim()) {
+      supabase.from('zampa_subrubros').insert({ nombre: tx['Subrubro/Producto'].trim() }).then(() => {});
+    }
+    if (tx.Subactividad?.trim()) {
+      supabase.from('zampa_unidades_negocio').insert({ nombre: tx.Subactividad.trim() }).then(() => {});
+    }
+  };
+
   // Add new transaction
   const addTransaction = async (newTx: Transaction) => {
     const payload = mapToSupabase(newTx);
@@ -91,6 +114,9 @@ export const useSupabaseTransactions = () => {
     } else if (inserted && inserted[0]) {
       const mapped = mapFromSupabase(inserted[0]);
       setData(prev => [mapped, ...prev]);
+      
+      // Sync lists dynamically
+      syncListsWithSupabase(mapped);
       return true;
     }
     return false;
@@ -106,12 +132,15 @@ export const useSupabaseTransactions = () => {
       .select();
 
     if (error) {
-      console.error('Error actualizando transacciﾃｳn:', error);
+      console.error('Error actualizando transacción:', error);
       alert('Error al actualizar en Supabase: ' + error.message);
       return false;
     } else if (updatedRows && updatedRows[0]) {
       const mapped = mapFromSupabase(updatedRows[0]);
       setData(prev => prev.map(t => t.id === id ? mapped : t));
+      
+      // Sync lists dynamically
+      syncListsWithSupabase(mapped);
       return true;
     }
     return false;
@@ -205,6 +234,10 @@ export const useSupabaseTransactions = () => {
     } else if (insertedRows) {
       const mapped = insertedRows.map(mapFromSupabase);
       setData(prev => [...prev, ...mapped]);
+      
+      // Sync lists dynamically
+      mapped.forEach(tx => syncListsWithSupabase(tx));
+      
       return true;
     }
     return false;
