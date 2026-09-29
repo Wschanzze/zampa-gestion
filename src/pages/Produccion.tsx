@@ -14,7 +14,11 @@ import {
   Snowflake,
   PackageCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Search
 } from 'lucide-react';
 import {
   LineChart,
@@ -37,6 +41,20 @@ const Produccion = () => {
   // Date filters
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Table sorting & quick search
+  const [sortField, setSortField] = useState<'fecha' | 'lote' | 'litros_leche' | 'kg_totales' | 'rendimiento'>('fecha');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [tableSearch, setTableSearch] = useState('');
+
+  const handleSort = (field: 'fecha' | 'lote' | 'litros_leche' | 'kg_totales' | 'rendimiento') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'lote' ? 'asc' : 'desc');
+    }
+  };
 
   const [formData, setFormData] = useState({
     fecha_elaboracion: new Date().toISOString().split('T')[0],
@@ -97,6 +115,49 @@ const Produccion = () => {
       return true;
     });
   }, [data, startDate, endDate]);
+
+  // Memoized sorted and searched data for the table
+  const sortedData = useMemo(() => {
+    let result = filteredData;
+
+    if (tableSearch.trim()) {
+      const q = tableSearch.toLowerCase().trim();
+      result = result.filter(row => 
+        (row.lote && row.lote.toLowerCase().includes(q)) ||
+        (row.producto && row.producto.toLowerCase().includes(q)) ||
+        (row.tipo_queso && row.tipo_queso.toLowerCase().includes(q))
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      if (sortField === 'lote') {
+        const res = (a.lote || '').localeCompare(b.lote || '', undefined, { numeric: true, sensitivity: 'base' });
+        if (res !== 0) return sortDirection === 'asc' ? res : -res;
+        return new Date(b.fecha_elaboracion).getTime() - new Date(a.fecha_elaboracion).getTime();
+      }
+      if (sortField === 'fecha') {
+        const timeA = new Date(a.fecha_elaboracion).getTime() || 0;
+        const timeB = new Date(b.fecha_elaboracion).getTime() || 0;
+        if (timeA !== timeB) return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+        return (a.lote || '').localeCompare(b.lote || '', undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (sortField === 'litros_leche') {
+        const diff = Number(a.litros_leche || 0) - Number(b.litros_leche || 0);
+        return sortDirection === 'asc' ? diff : -diff;
+      }
+      if (sortField === 'kg_totales') {
+        const diff = Number(a.kg_totales || 0) - Number(b.kg_totales || 0);
+        return sortDirection === 'asc' ? diff : -diff;
+      }
+      if (sortField === 'rendimiento') {
+        const yieldA = a.rendimiento ? Number(a.rendimiento) : ((a.kg_totales / a.litros_leche) * 100) || 0;
+        const yieldB = b.rendimiento ? Number(b.rendimiento) : ((b.kg_totales / b.litros_leche) * 100) || 0;
+        const diff = yieldA - yieldB;
+        return sortDirection === 'asc' ? diff : -diff;
+      }
+      return 0;
+    });
+  }, [filteredData, tableSearch, sortField, sortDirection]);
 
   // Derived metrics
   const totalLitros = filteredData.reduce((acc, curr) => acc + Number(curr.litros_leche), 0);
@@ -508,26 +569,154 @@ const Produccion = () => {
 
       {/* Data Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] overflow-hidden">
-        <div className="p-5 border-b border-[#e0d6c8] bg-[#fdfcfb] flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[#2b2824]">Registros de Elaboración</h3>
-          <span className="text-sm text-gray-500 font-medium">{filteredData.length} resultados</span>
+        <div className="p-4 sm:p-5 border-b border-[#e0d6c8] bg-[#fdfcfb] flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-[#2b2824]">Registros de Elaboración</h3>
+            <p className="text-xs text-[#6b645c] mt-0.5">Historial de producción, lotes y rendimientos</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Quick search input */}
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b7355]" />
+              <input
+                type="text"
+                placeholder="Buscar lote o queso..."
+                value={tableSearch}
+                onChange={(e) => setTableSearch(e.target.value)}
+                className="pl-8 pr-2.5 py-1.5 text-xs bg-[#faf9f6] border border-[#e0d6c8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8b7355] text-[#2b2824] w-36 sm:w-44"
+              />
+              {tableSearch && (
+                <button
+                  onClick={() => setTableSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Sort Pills */}
+            <div className="flex items-center space-x-1 bg-[#f4ebd8]/60 p-1 rounded-lg text-xs">
+              <span className="text-[11px] text-[#6b645c] font-semibold px-1">Ordenar:</span>
+              <button
+                onClick={() => handleSort('fecha')}
+                className={`px-2.5 py-1 rounded font-bold transition-all flex items-center space-x-1 ${
+                  sortField === 'fecha'
+                    ? 'bg-white text-[#2b2824] shadow-xs'
+                    : 'text-[#6b645c] hover:text-[#2b2824]'
+                }`}
+                title="Ordenar por fecha"
+              >
+                <span>Fecha</span>
+                {sortField === 'fecha' && (
+                  sortDirection === 'asc' ? <ArrowUp size={12} className="text-[#8b7355]" /> : <ArrowDown size={12} className="text-[#8b7355]" />
+                )}
+              </button>
+
+              <button
+                onClick={() => handleSort('lote')}
+                className={`px-2.5 py-1 rounded font-bold transition-all flex items-center space-x-1 ${
+                  sortField === 'lote'
+                    ? 'bg-white text-[#2b2824] shadow-xs'
+                    : 'text-[#6b645c] hover:text-[#2b2824]'
+                }`}
+                title="Ordenar por lote"
+              >
+                <span>Lote</span>
+                {sortField === 'lote' && (
+                  sortDirection === 'asc' ? <ArrowUp size={12} className="text-[#8b7355]" /> : <ArrowDown size={12} className="text-[#8b7355]" />
+                )}
+              </button>
+            </div>
+
+            <span className="text-xs text-gray-500 font-medium px-2 py-1 bg-gray-50 rounded-lg border border-gray-200">
+              {sortedData.length} {sortedData.length === 1 ? 'lote' : 'lotes'}
+            </span>
+          </div>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
-              <tr className="bg-[#f4ebd8]/50 text-[#8b7355] text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-semibold">Fecha</th>
-                <th className="px-6 py-4 font-semibold">Lote</th>
+              <tr className="bg-[#f4ebd8]/50 text-[#8b7355] text-xs uppercase tracking-wider select-none">
+                <th 
+                  onClick={() => handleSort('fecha')}
+                  className="px-6 py-4 font-semibold cursor-pointer hover:bg-[#e0d6c8]/40 transition-colors group"
+                  title="Ordenar por fecha"
+                >
+                  <div className="flex items-center space-x-1.5">
+                    <span>Fecha</span>
+                    {sortField === 'fecha' ? (
+                      sortDirection === 'asc' ? <ArrowUp size={13} className="text-[#8b7355]" /> : <ArrowDown size={13} className="text-[#8b7355]" />
+                    ) : (
+                      <ArrowUpDown size={12} className="text-gray-400 opacity-40 group-hover:opacity-100" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('lote')}
+                  className="px-6 py-4 font-semibold cursor-pointer hover:bg-[#e0d6c8]/40 transition-colors group"
+                  title="Ordenar por lote"
+                >
+                  <div className="flex items-center space-x-1.5">
+                    <span>Lote</span>
+                    {sortField === 'lote' ? (
+                      sortDirection === 'asc' ? <ArrowUp size={13} className="text-[#8b7355]" /> : <ArrowDown size={13} className="text-[#8b7355]" />
+                    ) : (
+                      <ArrowUpDown size={12} className="text-gray-400 opacity-40 group-hover:opacity-100" />
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 font-semibold">Producto</th>
                 <th className="px-6 py-4 font-semibold">Variedad</th>
-                <th className="px-6 py-4 font-semibold text-right">Leche (L)</th>
-                <th className="px-6 py-4 font-semibold text-right">Queso (Kg)</th>
-                <th className="px-6 py-4 font-semibold text-right">Rendimiento</th>
+                <th 
+                  onClick={() => handleSort('litros_leche')}
+                  className="px-6 py-4 font-semibold text-right cursor-pointer hover:bg-[#e0d6c8]/40 transition-colors group"
+                  title="Ordenar por litros de leche"
+                >
+                  <div className="flex items-center justify-end space-x-1.5">
+                    <span>Leche (L)</span>
+                    {sortField === 'litros_leche' ? (
+                      sortDirection === 'asc' ? <ArrowUp size={13} className="text-[#8b7355]" /> : <ArrowDown size={13} className="text-[#8b7355]" />
+                    ) : (
+                      <ArrowUpDown size={12} className="text-gray-400 opacity-40 group-hover:opacity-100" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('kg_totales')}
+                  className="px-6 py-4 font-semibold text-right cursor-pointer hover:bg-[#e0d6c8]/40 transition-colors group"
+                  title="Ordenar por kg producidos"
+                >
+                  <div className="flex items-center justify-end space-x-1.5">
+                    <span>Queso (Kg)</span>
+                    {sortField === 'kg_totales' ? (
+                      sortDirection === 'asc' ? <ArrowUp size={13} className="text-[#8b7355]" /> : <ArrowDown size={13} className="text-[#8b7355]" />
+                    ) : (
+                      <ArrowUpDown size={12} className="text-gray-400 opacity-40 group-hover:opacity-100" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('rendimiento')}
+                  className="px-6 py-4 font-semibold text-right cursor-pointer hover:bg-[#e0d6c8]/40 transition-colors group"
+                  title="Ordenar por rendimiento"
+                >
+                  <div className="flex items-center justify-end space-x-1.5">
+                    <span>Rendimiento</span>
+                    {sortField === 'rendimiento' ? (
+                      sortDirection === 'asc' ? <ArrowUp size={13} className="text-[#8b7355]" /> : <ArrowDown size={13} className="text-[#8b7355]" />
+                    ) : (
+                      <ArrowUpDown size={12} className="text-gray-400 opacity-40 group-hover:opacity-100" />
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 font-semibold text-center">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0d6c8]/60">
-              {filteredData.map((row) => {
+              {sortedData.map((row) => {
                 const yieldVal = row.rendimiento ? Number(row.rendimiento) : ((row.kg_totales / row.litros_leche) * 100);
                 return (
                   <tr key={row.id} className="hover:bg-gray-50/80 transition-colors group">
@@ -574,19 +763,35 @@ const Produccion = () => {
                   </tr>
                 );
               })}
-              {filteredData.length === 0 && (
+              {sortedData.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Filter size={48} className="mb-4 text-[#e0d6c8]" />
                       <p className="text-lg font-medium text-[#6b645c]">No hay registros para este filtro</p>
-                      <p className="text-sm mt-1">Prueba cambiando las fechas o registrando un nuevo lote.</p>
-                      <button 
-                        onClick={clearFilters}
-                        className="mt-4 text-[#8b7355] font-semibold hover:underline"
-                      >
-                        Limpiar filtros
-                      </button>
+                      <p className="text-sm mt-1">
+                        {tableSearch 
+                          ? `No hay lotes que coincidan con "${tableSearch}".`
+                          : 'Prueba cambiando las fechas o registrando un nuevo lote.'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-4">
+                        {tableSearch && (
+                          <button 
+                            onClick={() => setTableSearch('')}
+                            className="text-[#8b7355] font-semibold hover:underline px-3 py-1 bg-[#f4ebd8] rounded-lg"
+                          >
+                            Limpiar búsqueda
+                          </button>
+                        )}
+                        {(startDate || endDate) && (
+                          <button 
+                            onClick={clearFilters}
+                            className="text-[#8b7355] font-semibold hover:underline px-3 py-1 bg-[#f4ebd8] rounded-lg"
+                          >
+                            Limpiar fechas
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { calculateSummaryByUnit, getAvailableYears, parseCurrency } from '../utils/calculations';
 import type { Transaction } from '../utils/calculations';
 import { 
@@ -11,6 +11,7 @@ import {
   ArrowDownRight,
   Layers, 
   Calendar,
+  CalendarRange,
   WalletCards,
   ArrowRight,
   ArrowUpDown,
@@ -19,7 +20,10 @@ import {
   Building2,
   CreditCard,
   Tag,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -41,7 +45,7 @@ const formatKg = (val: number) => {
   return `${val.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
 };
 
-// Date parser helper to sort by date (newest first)
+// Date parser helper to sort chronologically (newest first)
 const parseDateToTimestamp = (fechaStr?: string): number => {
   if (!fechaStr) return 0;
   if (fechaStr.includes('/')) {
@@ -55,6 +59,57 @@ const parseDateToTimestamp = (fechaStr?: string): number => {
   }
   const t = new Date(fechaStr).getTime();
   return isNaN(t) ? 0 : t;
+};
+
+// Converts 'DD/MM/YYYY' or 'YYYY-MM-DD' into standardized 'YYYY-MM-DD' for date comparisons
+const parseDateToComparable = (fechaStr?: string): string => {
+  if (!fechaStr) return '';
+  if (fechaStr.includes('/')) {
+    const parts = fechaStr.split('/');
+    if (parts.length === 3) {
+      const d = parts[0].padStart(2, '0');
+      const m = parts[1].padStart(2, '0');
+      const y = parts[2].trim();
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return fechaStr.trim();
+};
+
+const getPresetRange = (preset: string) => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-indexed
+  const d = now.getDate();
+
+  const toIso = (year: number, month: number, day: number) => {
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
+  if (preset === 'mes_actual') {
+    const start = toIso(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const end = toIso(y, m, lastDay);
+    return { start, end };
+  }
+  if (preset === 'mes_anterior') {
+    const prevMonthDate = new Date(y, m - 1, 1);
+    const py = prevMonthDate.getFullYear();
+    const pm = prevMonthDate.getMonth();
+    const lastDay = new Date(py, pm + 1, 0).getDate();
+    return { start: toIso(py, pm, 1), end: toIso(py, pm, lastDay) };
+  }
+  if (preset === 'ultimos_30') {
+    const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return { 
+      start: toIso(past30.getFullYear(), past30.getMonth(), past30.getDate()), 
+      end: toIso(y, m, d) 
+    };
+  }
+  if (preset === 'anio_actual') {
+    return { start: `${y}-01-01`, end: `${y}-12-31` };
+  }
+  return { start: '', end: '' };
 };
 
 const getCuentaBadgeClass = (cuenta?: string) => {
@@ -84,13 +139,41 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   const [viewMode, setViewMode] = useState<'todos' | 'ingresos' | 'egresos'>('todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [rubroFilter, setRubroFilter] = useState('TODOS');
-  const [ingresosDisplayLimit, setIngresosDisplayLimit] = useState(10);
-  const [egresosDisplayLimit, setEgresosDisplayLimit] = useState(10);
+
+  // Date Range Filter States
+  const [fechaDesde, setFechaDesde] = useState<string>('');
+  const [fechaHasta, setFechaHasta] = useState<string>('');
+  const [activePreset, setActivePreset] = useState<string>('todos');
+
+  // Pagination States (independent for Ingresos and Egresos)
+  const [ingresosPage, setIngresosPage] = useState(1);
+  const [ingresosPerPage, setIngresosPerPage] = useState(10);
+  const [egresosPage, setEgresosPage] = useState(1);
+  const [egresosPerPage, setEgresosPerPage] = useState(10);
 
   const availableYears = useMemo(() => getAvailableYears(data), [data]);
   const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || 'TODOS');
 
-  // Filter data by selected year or all
+  // Reset pagination whenever any filter changes
+  useEffect(() => {
+    setIngresosPage(1);
+    setEgresosPage(1);
+  }, [searchQuery, rubroFilter, fechaDesde, fechaHasta, selectedYear, viewMode]);
+
+  // Handle Preset Clicks
+  const handleApplyPreset = (presetKey: string) => {
+    setActivePreset(presetKey);
+    if (presetKey === 'todos') {
+      setFechaDesde('');
+      setFechaHasta('');
+    } else {
+      const range = getPresetRange(presetKey);
+      setFechaDesde(range.start);
+      setFechaHasta(range.end);
+    }
+  };
+
+  // Filter data by selected year for Executive Summary
   const filteredData = useMemo(() => {
     if (selectedYear === 'TODOS') return data;
     return data.filter(d => {
@@ -99,7 +182,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
     });
   }, [data, selectedYear]);
 
-  // Overall calculations for Executive Summary
+  // Filtered data specifically for 'ingresos/egresos' tab (incorporating date range filter)
+  const tabData = useMemo(() => {
+    if (!fechaDesde && !fechaHasta) return filteredData;
+    return filteredData.filter(row => {
+      const dStr = parseDateToComparable(row.Fecha);
+      if (!dStr) return true;
+      if (fechaDesde && dStr < fechaDesde) return false;
+      if (fechaHasta && dStr > fechaHasta) return false;
+      return true;
+    });
+  }, [filteredData, fechaDesde, fechaHasta]);
+
+  // Overall calculations for Executive Summary (Tab 1)
   const summary = useMemo(() => calculateSummaryByUnit(filteredData), [filteredData]);
   const units = ['TAMBO', 'RECRIA', 'QUESERIA', 'COMUN'] as const;
 
@@ -132,23 +227,35 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
     }));
   }, [summary]);
 
-  // --- Specific Calculations for the "ingresos/egresos" Tab ---
+  // --- Specific Calculations for the "ingresos/egresos" Tab (Calculated from tabData) ---
   const ingresosList = useMemo(() => {
-    return filteredData
+    return tabData
       .filter(item => parseCurrency(item.Ingresos) > 0)
       .sort((a, b) => parseDateToTimestamp(b.Fecha) - parseDateToTimestamp(a.Fecha));
-  }, [filteredData]);
+  }, [tabData]);
 
   const egresosList = useMemo(() => {
-    return filteredData
+    return tabData
       .filter(item => parseCurrency(item.Egresos) > 0)
       .sort((a, b) => parseDateToTimestamp(b.Fecha) - parseDateToTimestamp(a.Fecha));
-  }, [filteredData]);
+  }, [tabData]);
+
+  // Dynamic totals for Tab 2 reflecting date range filters
+  const tabTotalIngresos = useMemo(() => {
+    return ingresosList.reduce((acc, r) => acc + parseCurrency(r.Ingresos), 0);
+  }, [ingresosList]);
+
+  const tabTotalEgresos = useMemo(() => {
+    return egresosList.reduce((acc, r) => acc + parseCurrency(r.Egresos), 0);
+  }, [egresosList]);
+
+  const tabBalanceNeto = tabTotalIngresos - tabTotalEgresos;
+  const tabMargenOperativo = tabTotalIngresos > 0 ? ((tabBalanceNeto / tabTotalIngresos) * 100).toFixed(1) : '0';
 
   const countIngresos = ingresosList.length;
   const countEgresos = egresosList.length;
-  const avgIngreso = countIngresos > 0 ? totalIngresos / countIngresos : 0;
-  const avgEgreso = countEgresos > 0 ? totalEgresos / countEgresos : 0;
+  const avgIngreso = countIngresos > 0 ? tabTotalIngresos / countIngresos : 0;
+  const avgEgreso = countEgresos > 0 ? tabTotalEgresos / countEgresos : 0;
 
   // Breakdown by Rubro for Ingresos
   const ingresosByRubro = useMemo(() => {
@@ -165,10 +272,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         name,
         total: stat.total,
         count: stat.count,
-        pct: totalIngresos > 0 ? (stat.total / totalIngresos) * 100 : 0
+        pct: tabTotalIngresos > 0 ? (stat.total / tabTotalIngresos) * 100 : 0
       }))
       .sort((a, b) => b.total - a.total);
-  }, [ingresosList, totalIngresos]);
+  }, [ingresosList, tabTotalIngresos]);
 
   // Breakdown by Rubro for Egresos
   const egresosByRubro = useMemo(() => {
@@ -185,10 +292,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         name,
         total: stat.total,
         count: stat.count,
-        pct: totalEgresos > 0 ? (stat.total / totalEgresos) * 100 : 0
+        pct: tabTotalEgresos > 0 ? (stat.total / tabTotalEgresos) * 100 : 0
       }))
       .sort((a, b) => b.total - a.total);
-  }, [egresosList, totalEgresos]);
+  }, [egresosList, tabTotalEgresos]);
 
   // Top Clientes
   const topClientes = useMemo(() => {
@@ -205,10 +312,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         name,
         total: stat.total,
         count: stat.count,
-        pct: totalIngresos > 0 ? (stat.total / totalIngresos) * 100 : 0
+        pct: tabTotalIngresos > 0 ? (stat.total / tabTotalIngresos) * 100 : 0
       }))
       .sort((a, b) => b.total - a.total);
-  }, [ingresosList, totalIngresos]);
+  }, [ingresosList, tabTotalIngresos]);
 
   // Top Proveedores
   const topProveedores = useMemo(() => {
@@ -225,10 +332,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         name,
         total: stat.total,
         count: stat.count,
-        pct: totalEgresos > 0 ? (stat.total / totalEgresos) * 100 : 0
+        pct: tabTotalEgresos > 0 ? (stat.total / tabTotalEgresos) * 100 : 0
       }))
       .sort((a, b) => b.total - a.total);
-  }, [egresosList, totalEgresos]);
+  }, [egresosList, tabTotalEgresos]);
 
   // Ingresos by Cuenta / Medio de Cobro
   const ingresosByCuenta = useMemo(() => {
@@ -245,10 +352,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         name,
         total: stat.total,
         count: stat.count,
-        pct: totalIngresos > 0 ? (stat.total / totalIngresos) * 100 : 0
+        pct: tabTotalIngresos > 0 ? (stat.total / tabTotalIngresos) * 100 : 0
       }))
       .sort((a, b) => b.total - a.total);
-  }, [ingresosList, totalIngresos]);
+  }, [ingresosList, tabTotalIngresos]);
 
   // Egresos by Subactividad / Sector
   const egresosBySubactividad = useMemo(() => {
@@ -265,19 +372,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         name,
         total: stat.total,
         count: stat.count,
-        pct: totalEgresos > 0 ? (stat.total / totalEgresos) * 100 : 0
+        pct: tabTotalEgresos > 0 ? (stat.total / tabTotalEgresos) * 100 : 0
       }))
       .sort((a, b) => b.total - a.total);
-  }, [egresosList, totalEgresos]);
+  }, [egresosList, tabTotalEgresos]);
 
-  // Distinct Rubros for Filter
+  // Distinct Rubros for Dropdown Filter
   const availableRubros = useMemo(() => {
     const set = new Set<string>();
-    filteredData.forEach(d => {
+    tabData.forEach(d => {
       if (d.Rubro?.trim()) set.add(d.Rubro.trim());
     });
     return Array.from(set).sort();
-  }, [filteredData]);
+  }, [tabData]);
 
   // Clean, Simplified Movements Feeds
   const filteredIngresosFeed = useMemo(() => {
@@ -310,6 +417,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
     });
   }, [egresosList, searchQuery, rubroFilter]);
 
+  // Paginated Slices
+  const totalIngresosPages = Math.max(1, Math.ceil(filteredIngresosFeed.length / ingresosPerPage));
+  const paginatedIngresos = useMemo(() => {
+    const start = (ingresosPage - 1) * ingresosPerPage;
+    return filteredIngresosFeed.slice(start, start + ingresosPerPage);
+  }, [filteredIngresosFeed, ingresosPage, ingresosPerPage]);
+
+  const totalEgresosPages = Math.max(1, Math.ceil(filteredEgresosFeed.length / egresosPerPage));
+  const paginatedEgresos = useMemo(() => {
+    const start = (egresosPage - 1) * egresosPerPage;
+    return filteredEgresosFeed.slice(start, start + egresosPerPage);
+  }, [filteredEgresosFeed, egresosPage, egresosPerPage]);
+
   return (
     <div className="space-y-6">
       
@@ -325,7 +445,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
 
         <div className="flex items-center space-x-2 self-start sm:self-auto">
           <Calendar size={15} className="text-[#8b7355]" />
-          <label className="text-xs font-semibold text-[#6b645c] uppercase">Período:</label>
+          <label className="text-xs font-semibold text-[#6b645c] uppercase">Período Base:</label>
           <select 
             value={selectedYear} 
             onChange={(e) => setSelectedYear(e.target.value)}
@@ -596,9 +716,88 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       {/* TAB 2: INGRESOS / EGRESOS (Clean & Simplified Summary View)              */}
       {/* ========================================================================= */}
       {activeTab === 'ingresos/egresos' && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           
-          {/* Top KPI Summary Ribbon */}
+          {/* Date Range & Quick Presets Filter Box */}
+          <div className="bg-white/95 p-3.5 sm:p-4 rounded-xl border border-[#e0d6c8] shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e0d6c8]/60 pb-2.5">
+              <div className="flex items-center space-x-2 text-xs font-bold text-[#2b2824]">
+                <CalendarRange size={16} className="text-[#8b7355]" />
+                <span>Filtrar por Rango de Fecha</span>
+                {(fechaDesde || fechaHasta) && (
+                  <span className="text-[10px] bg-[#f4ebd8] text-[#8b7355] font-bold px-2 py-0.5 rounded-full border border-[#e0d6c8]">
+                    Filtrado Activo
+                  </span>
+                )}
+              </div>
+              
+              {/* Quick Presets Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-[11px] text-[#6b645c] font-semibold mr-1">Rápido:</span>
+                {[
+                  { id: 'todos', label: 'Todo el período' },
+                  { id: 'mes_actual', label: 'Este mes' },
+                  { id: 'ultimos_30', label: 'Últimos 30 días' },
+                  { id: 'mes_anterior', label: 'Mes anterior' },
+                  { id: 'anio_actual', label: 'Año en curso' }
+                ].map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleApplyPreset(p.id)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                      activePreset === p.id
+                        ? 'bg-[#8b7355] text-white shadow-xs'
+                        : 'bg-[#f4ebd8]/60 text-[#6b645c] hover:bg-[#f4ebd8] hover:text-[#2b2824]'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date Pickers (Desde / Hasta) */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center space-x-2">
+                <label className="text-xs font-semibold text-[#6b645c]">Desde:</label>
+                <input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => {
+                    setFechaDesde(e.target.value);
+                    setActivePreset('custom');
+                  }}
+                  className="px-2.5 py-1.5 text-xs bg-[#faf9f6] border border-[#e0d6c8] rounded-lg text-[#2b2824] font-medium focus:ring-1 focus:ring-[#8b7355] outline-none"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <label className="text-xs font-semibold text-[#6b645c]">Hasta:</label>
+                <input
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => {
+                    setFechaHasta(e.target.value);
+                    setActivePreset('custom');
+                  }}
+                  className="px-2.5 py-1.5 text-xs bg-[#faf9f6] border border-[#e0d6c8] rounded-lg text-[#2b2824] font-medium focus:ring-1 focus:ring-[#8b7355] outline-none"
+                />
+              </div>
+
+              {(fechaDesde || fechaHasta) && (
+                <button
+                  onClick={() => handleApplyPreset('todos')}
+                  className="flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-50 border border-rose-200 rounded-lg transition-colors ml-auto sm:ml-2"
+                  title="Restablecer fechas"
+                >
+                  <RotateCcw size={12} />
+                  <span>Limpiar fechas</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Top KPI Summary Ribbon (Dynamic for Tab 2) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             
             {/* Ingresos Card */}
@@ -610,10 +809,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                 </span>
               </div>
               <p className="text-2xl font-black text-emerald-700 mt-2 font-mono">
-                {formatCurrency(totalIngresos)}
+                {formatCurrency(tabTotalIngresos)}
               </p>
               <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-emerald-50">
-                <span>{countIngresos} cobros registrados</span>
+                <span>{countIngresos} cobros en rango</span>
                 <span>Promedio: <strong className="text-emerald-800 font-mono">{formatCurrency(avgIngreso)}</strong></span>
               </div>
             </div>
@@ -627,29 +826,29 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                 </span>
               </div>
               <p className="text-2xl font-black text-rose-700 mt-2 font-mono">
-                {formatCurrency(totalEgresos)}
+                {formatCurrency(tabTotalEgresos)}
               </p>
               <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-rose-50">
-                <span>{countEgresos} pagos / costos</span>
+                <span>{countEgresos} pagos en rango</span>
                 <span>Promedio: <strong className="text-rose-800 font-mono">{formatCurrency(avgEgreso)}</strong></span>
               </div>
             </div>
 
             {/* Balance Neto */}
-            <div className={`bg-white/95 p-4 rounded-xl border ${resultadoNeto >= 0 ? 'border-amber-300' : 'border-rose-300'} shadow-sm relative overflow-hidden`}>
+            <div className={`bg-white/95 p-4 rounded-xl border ${tabBalanceNeto >= 0 ? 'border-amber-300' : 'border-rose-300'} shadow-sm relative overflow-hidden`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Balance Operativo</span>
-                <span className={`p-1.5 rounded-lg ${resultadoNeto >= 0 ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800'}`}>
+                <span className={`p-1.5 rounded-lg ${tabBalanceNeto >= 0 ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800'}`}>
                   <DollarSign size={16} />
                 </span>
               </div>
-              <p className={`text-2xl font-black mt-2 font-mono ${resultadoNeto >= 0 ? 'text-amber-950' : 'text-rose-700'}`}>
-                {formatCurrency(resultadoNeto)}
+              <p className={`text-2xl font-black mt-2 font-mono ${tabBalanceNeto >= 0 ? 'text-amber-950' : 'text-rose-700'}`}>
+                {formatCurrency(tabBalanceNeto)}
               </p>
               <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-[#f4ebd8]">
                 <span>Margen sobre ingresos</span>
-                <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${resultadoNeto >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                  {margenOperativo}%
+                <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${tabBalanceNeto >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  {tabMargenOperativo}%
                 </span>
               </div>
             </div>
@@ -677,7 +876,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                 onChange={(e) => setRubroFilter(e.target.value)}
                 className="px-3 py-1.5 text-xs sm:text-sm bg-[#faf9f6] border border-[#e0d6c8] rounded-lg font-medium text-[#2b2824] focus:outline-none focus:ring-1 focus:ring-[#8b7355]"
               >
-                <option value="TODOS">Todos los rubros</option>
+                <option value="TODOS">Todos los rubros ({availableRubros.length})</option>
                 {availableRubros.map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
@@ -720,360 +919,451 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
 
           </div>
 
-          {/* Main 2-Column or Single-Column Layout */}
-          <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6`}>
+          {/* Main Layout: Paired Rows ensuring identical heights between Ingresos and Egresos */}
+          <div className="space-y-6">
             
-            {/* ========================================================================= */}
-            {/* SECCIÓN RESUMEN DE INGRESOS                                               */}
-            {/* ========================================================================= */}
-            {(viewMode === 'todos' || viewMode === 'ingresos') && (
-              <div className="space-y-4">
-                
-                {/* Column Section Title */}
+            {/* Row 0: Column Section Titles */}
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6`}>
+              {(viewMode === 'todos' || viewMode === 'ingresos') && (
                 <div className="bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-xs flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <ArrowUpRight size={18} />
                     <h4 className="font-bold text-sm sm:text-base">Resumen de Ingresos</h4>
                   </div>
                   <span className="text-xs font-mono font-bold bg-white/20 px-2 py-0.5 rounded">
-                    {formatCurrency(totalIngresos)}
+                    {formatCurrency(tabTotalIngresos)}
                   </span>
                 </div>
+              )}
 
-                {/* 1. Ingresos por Rubro */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm">
-                  <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
-                    <Tag size={13} className="text-emerald-700" />
-                    <span>Facturación por Rubro</span>
-                  </h5>
-                  
-                  {ingresosByRubro.length === 0 ? (
-                    <p className="text-xs text-[#8c827a] italic py-2">No hay ingresos registrados en este período.</p>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {ingresosByRubro.map((item) => (
-                        <div key={item.name} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-[#2b2824] truncate pr-2">{item.name}</span>
-                            <div className="flex items-center space-x-2 whitespace-nowrap">
-                              <span className="text-[11px] text-[#6b645c] font-medium">{item.count} ops</span>
-                              <span className="font-mono font-bold text-emerald-800">{formatCurrency(item.total)}</span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded">
-                                {item.pct.toFixed(0)}%
-                              </span>
-                            </div>
-                          </div>
-                          {/* Progress Bar */}
-                          <div className="w-full bg-[#f4ebd8]/70 h-2 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-emerald-600 h-full rounded-full transition-all duration-300"
-                              style={{ width: `${Math.min(100, Math.max(2, item.pct))}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Top Clientes */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm">
-                  <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
-                    <Users size={13} className="text-emerald-700" />
-                    <span>Principales Clientes y Destinos</span>
-                  </h5>
-
-                  {topClientes.length === 0 ? (
-                    <p className="text-xs text-[#8c827a] italic py-2">No hay registros de clientes.</p>
-                  ) : (
-                    <div className="divide-y divide-[#e0d6c8]/50">
-                      {topClientes.slice(0, 5).map((cli, idx) => (
-                        <div key={cli.name} className="py-2 flex items-center justify-between text-xs first:pt-0 last:pb-0">
-                          <div className="flex items-center space-x-2 truncate pr-2">
-                            <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold flex items-center justify-center shrink-0">
-                              {idx + 1}
-                            </span>
-                            <span className="font-bold text-[#2b2824] truncate">{cli.name}</span>
-                          </div>
-                          <div className="flex items-center space-x-2 whitespace-nowrap">
-                            <span className="text-[11px] text-[#6b645c]">{cli.count} vtas</span>
-                            <span className="font-mono font-bold text-emerald-800">{formatCurrency(cli.total)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Distribución por Medio de Cobro / Cuenta */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm">
-                  <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
-                    <CreditCard size={13} className="text-emerald-700" />
-                    <span>Cobros por Medio / Cuenta</span>
-                  </h5>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {ingresosByCuenta.map(c => (
-                      <div key={c.name} className="p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70">
-                        <span className="text-[11px] font-bold text-[#2b2824] block truncate">{c.name}</span>
-                        <p className="text-xs font-bold font-mono text-emerald-800 mt-1">{formatCurrency(c.total)}</p>
-                        <span className="text-[10px] text-[#6b645c]">{c.count} registros ({c.pct.toFixed(0)}%)</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4. Movimientos Resumidos de Ingresos (Clean List) */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex items-center justify-between">
-                    <div>
-                      <h5 className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Movimientos de Ingreso</h5>
-                      <p className="text-[11px] text-[#6b645c]">Registro simplificado de cobros</p>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200">
-                      {filteredIngresosFeed.length} operaciones
-                    </span>
-                  </div>
-
-                  {filteredIngresosFeed.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-[#8c827a] italic">
-                      No se encontraron ingresos con los filtros aplicados.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-[#e0d6c8]/60">
-                      {filteredIngresosFeed.slice(0, ingresosDisplayLimit).map((item, idx) => (
-                        <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex items-center justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-[10px] font-mono font-bold text-[#8b7355] bg-[#f4ebd8] px-1.5 py-0.5 rounded">
-                                {item.Fecha}
-                              </span>
-                              <span className="font-bold text-xs text-[#2b2824] truncate">
-                                {item['Prov/Cliente'] || 'Cliente'}
-                              </span>
-                              <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getCuentaBadgeClass(item.Cuenta)}`}>
-                                {item.Cuenta || 'N/A'}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center space-x-2 text-[11px] text-[#6b645c] mt-0.5 truncate">
-                              <span className="font-medium text-[#4a453e]">{item.Rubro || 'Sin Rubro'}</span>
-                              {item['Subrubro/Producto'] && (
-                                <>
-                                  <span>•</span>
-                                  <span className="truncate">{item['Subrubro/Producto']}</span>
-                                </>
-                              )}
-                              {item.Observaciones && (
-                                <>
-                                  <span>•</span>
-                                  <span className="italic text-[#8c827a] truncate max-w-[140px] sm:max-w-[200px]">{item.Observaciones}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="text-right whitespace-nowrap">
-                            <span className="font-mono font-bold text-sm text-emerald-700">
-                              +{formatCurrency(parseCurrency(item.Ingresos))}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Load More Button */}
-                  {filteredIngresosFeed.length > ingresosDisplayLimit && (
-                    <div className="p-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/60 text-center">
-                      <button
-                        onClick={() => setIngresosDisplayLimit(prev => prev + 15)}
-                        className="text-xs font-bold text-[#8b7355] hover:text-[#705b42] transition-colors"
-                      >
-                        Mostrar más ({filteredIngresosFeed.length - ingresosDisplayLimit} restantes)
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            )}
-
-            {/* ========================================================================= */}
-            {/* SECCIÓN RESUMEN DE EGRESOS                                                */}
-            {/* ========================================================================= */}
-            {(viewMode === 'todos' || viewMode === 'egresos') && (
-              <div className="space-y-4">
-                
-                {/* Column Section Title */}
+              {(viewMode === 'todos' || viewMode === 'egresos') && (
                 <div className="bg-rose-700 text-white px-4 py-2.5 rounded-xl shadow-xs flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <ArrowDownRight size={18} />
                     <h4 className="font-bold text-sm sm:text-base">Resumen de Egresos</h4>
                   </div>
                   <span className="text-xs font-mono font-bold bg-white/20 px-2 py-0.5 rounded">
-                    {formatCurrency(totalEgresos)}
+                    {formatCurrency(tabTotalEgresos)}
                   </span>
                 </div>
+              )}
+            </div>
 
-                {/* 1. Egresos por Rubro */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm">
-                  <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
-                    <Tag size={13} className="text-rose-700" />
-                    <span>Costos por Rubro de Gasto</span>
-                  </h5>
-                  
-                  {egresosByRubro.length === 0 ? (
-                    <p className="text-xs text-[#8c827a] italic py-2">No hay egresos registrados en este período.</p>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {egresosByRubro.map((item) => (
-                        <div key={item.name} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-[#2b2824] truncate pr-2">{item.name}</span>
-                            <div className="flex items-center space-x-2 whitespace-nowrap">
-                              <span className="text-[11px] text-[#6b645c] font-medium">{item.count} ops</span>
-                              <span className="font-mono font-bold text-rose-800">{formatCurrency(item.total)}</span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 bg-rose-50 text-rose-700 rounded">
-                                {item.pct.toFixed(0)}%
-                              </span>
+            {/* Row 1: Facturación por Rubro vs Costos por Rubro */}
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+              {(viewMode === 'todos' || viewMode === 'ingresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                      <Tag size={13} className="text-emerald-700" />
+                      <span>Facturación por Rubro</span>
+                    </h5>
+                    
+                    {ingresosByRubro.length === 0 ? (
+                      <p className="text-xs text-[#8c827a] italic py-2">No hay ingresos registrados para el período seleccionado.</p>
+                    ) : (
+                      <div className="max-h-60 overflow-y-auto pr-1 space-y-2.5">
+                        {ingresosByRubro.map((item) => (
+                          <div key={item.name} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-[#2b2824] truncate pr-2">{item.name}</span>
+                              <div className="flex items-center space-x-2 whitespace-nowrap">
+                                <span className="text-[11px] text-[#6b645c] font-medium">{item.count} ops</span>
+                                <span className="font-mono font-bold text-emerald-800">{formatCurrency(item.total)}</span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded">
+                                  {item.pct.toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+                            {/* Progress Bar */}
+                            <div className="w-full bg-[#f4ebd8]/70 h-2 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-emerald-600 h-full rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(100, Math.max(2, item.pct))}%` }}
+                              />
                             </div>
                           </div>
-                          {/* Progress Bar */}
-                          <div className="w-full bg-[#f4ebd8]/70 h-2 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-rose-600 h-full rounded-full transition-all duration-300"
-                              style={{ width: `${Math.min(100, Math.max(2, item.pct))}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Top Proveedores */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm">
-                  <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
-                    <Building2 size={13} className="text-rose-700" />
-                    <span>Principales Proveedores</span>
-                  </h5>
-
-                  {topProveedores.length === 0 ? (
-                    <p className="text-xs text-[#8c827a] italic py-2">No hay registros de proveedores.</p>
-                  ) : (
-                    <div className="divide-y divide-[#e0d6c8]/50">
-                      {topProveedores.slice(0, 5).map((prov, idx) => (
-                        <div key={prov.name} className="py-2 flex items-center justify-between text-xs first:pt-0 last:pb-0">
-                          <div className="flex items-center space-x-2 truncate pr-2">
-                            <span className="w-5 h-5 rounded-full bg-rose-50 text-rose-800 text-[10px] font-bold flex items-center justify-center shrink-0">
-                              {idx + 1}
-                            </span>
-                            <span className="font-bold text-[#2b2824] truncate">{prov.name}</span>
-                          </div>
-                          <div className="flex items-center space-x-2 whitespace-nowrap">
-                            <span className="text-[11px] text-[#6b645c]">{prov.count} pagos</span>
-                            <span className="font-mono font-bold text-rose-800">{formatCurrency(prov.total)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Distribución por Unidad de Negocio (Sector) */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm">
-                  <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
-                    <Layers size={13} className="text-rose-700" />
-                    <span>Egresos por Sector Productivo</span>
-                  </h5>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {egresosBySubactividad.map(s => (
-                      <div key={s.name} className="p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block mb-1 ${getSubactividadBadgeClass(s.name)}`}>
-                          {s.name}
-                        </span>
-                        <p className="text-xs font-bold font-mono text-rose-800">{formatCurrency(s.total)}</p>
-                        <span className="text-[10px] text-[#6b645c]">{s.pct.toFixed(0)}% del total</span>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
+              )}
 
-                {/* 4. Movimientos Resumidos de Egresos (Clean List) */}
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex items-center justify-between">
-                    <div>
-                      <h5 className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Movimientos de Egreso</h5>
-                      <p className="text-[11px] text-[#6b645c]">Registro simplificado de gastos</p>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-50 text-rose-800 rounded border border-rose-200">
-                      {filteredEgresosFeed.length} gastos
-                    </span>
+              {(viewMode === 'todos' || viewMode === 'egresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                      <Tag size={13} className="text-rose-700" />
+                      <span>Costos por Rubro de Gasto</span>
+                    </h5>
+                    
+                    {egresosByRubro.length === 0 ? (
+                      <p className="text-xs text-[#8c827a] italic py-2">No hay egresos registrados para el período seleccionado.</p>
+                    ) : (
+                      <div className="max-h-60 overflow-y-auto pr-1 space-y-2.5">
+                        {egresosByRubro.map((item) => (
+                          <div key={item.name} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-[#2b2824] truncate pr-2">{item.name}</span>
+                              <div className="flex items-center space-x-2 whitespace-nowrap">
+                                <span className="text-[11px] text-[#6b645c] font-medium">{item.count} ops</span>
+                                <span className="font-mono font-bold text-rose-800">{formatCurrency(item.total)}</span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 bg-rose-50 text-rose-700 rounded">
+                                  {item.pct.toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+                            {/* Progress Bar */}
+                            <div className="w-full bg-[#f4ebd8]/70 h-2 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-rose-600 h-full rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(100, Math.max(2, item.pct))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                </div>
+              )}
+            </div>
 
-                  {filteredEgresosFeed.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-[#8c827a] italic">
-                      No se encontraron egresos con los filtros aplicados.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-[#e0d6c8]/60">
-                      {filteredEgresosFeed.slice(0, egresosDisplayLimit).map((item, idx) => (
-                        <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex items-center justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-[10px] font-mono font-bold text-[#8b7355] bg-[#f4ebd8] px-1.5 py-0.5 rounded">
-                                {item.Fecha}
+            {/* Row 2: Principales Clientes vs Principales Proveedores */}
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+              {(viewMode === 'todos' || viewMode === 'ingresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                      <Users size={13} className="text-emerald-700" />
+                      <span>Principales Clientes y Destinos</span>
+                    </h5>
+
+                    {topClientes.length === 0 ? (
+                      <p className="text-xs text-[#8c827a] italic py-2">No hay registros de clientes en el rango seleccionado.</p>
+                    ) : (
+                      <div className="divide-y divide-[#e0d6c8]/50">
+                        {topClientes.slice(0, 5).map((cli, idx) => (
+                          <div key={cli.name} className="py-2 flex items-center justify-between text-xs first:pt-0 last:pb-0">
+                            <div className="flex items-center space-x-2 truncate pr-2">
+                              <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                {idx + 1}
                               </span>
-                              <span className="font-bold text-xs text-[#2b2824] truncate">
-                                {item['Prov/Cliente'] || 'Proveedor'}
-                              </span>
-                              <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getSubactividadBadgeClass(item.Subactividad)}`}>
-                                {item.Subactividad || 'COMUN'}
-                              </span>
+                              <span className="font-bold text-[#2b2824] truncate">{cli.name}</span>
                             </div>
-
-                            <div className="flex items-center space-x-2 text-[11px] text-[#6b645c] mt-0.5 truncate">
-                              <span className="font-medium text-[#4a453e]">{item.Rubro || 'Sin Rubro'}</span>
-                              {item['Subrubro/Producto'] && (
-                                <>
-                                  <span>•</span>
-                                  <span className="truncate">{item['Subrubro/Producto']}</span>
-                                </>
-                              )}
-                              {item.Observaciones && (
-                                <>
-                                  <span>•</span>
-                                  <span className="italic text-[#8c827a] truncate max-w-[140px] sm:max-w-[200px]">{item.Observaciones}</span>
-                                </>
-                              )}
+                            <div className="flex items-center space-x-2 whitespace-nowrap">
+                              <span className="text-[11px] text-[#6b645c]">{cli.count} vtas</span>
+                              <span className="font-mono font-bold text-emerald-800">{formatCurrency(cli.total)}</span>
                             </div>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
-                          <div className="text-right whitespace-nowrap">
-                            <span className="font-mono font-bold text-sm text-rose-700">
-                              -{formatCurrency(parseCurrency(item.Egresos))}
-                            </span>
+              {(viewMode === 'todos' || viewMode === 'egresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                      <Building2 size={13} className="text-rose-700" />
+                      <span>Principales Proveedores</span>
+                    </h5>
+
+                    {topProveedores.length === 0 ? (
+                      <p className="text-xs text-[#8c827a] italic py-2">No hay registros de proveedores en el rango seleccionado.</p>
+                    ) : (
+                      <div className="divide-y divide-[#e0d6c8]/50">
+                        {topProveedores.slice(0, 5).map((prov, idx) => (
+                          <div key={prov.name} className="py-2 flex items-center justify-between text-xs first:pt-0 last:pb-0">
+                            <div className="flex items-center space-x-2 truncate pr-2">
+                              <span className="w-5 h-5 rounded-full bg-rose-50 text-rose-800 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                {idx + 1}
+                              </span>
+                              <span className="font-bold text-[#2b2824] truncate">{prov.name}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 whitespace-nowrap">
+                              <span className="text-[11px] text-[#6b645c]">{prov.count} pagos</span>
+                              <span className="font-mono font-bold text-rose-800">{formatCurrency(prov.total)}</span>
+                            </div>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Row 3: Cobros por Medio vs Egresos por Sector */}
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+              {(viewMode === 'todos' || viewMode === 'ingresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
+                      <CreditCard size={13} className="text-emerald-700" />
+                      <span>Cobros por Medio / Cuenta</span>
+                    </h5>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {ingresosByCuenta.map(c => (
+                        <div key={c.name} className="p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
+                          <span className="text-[11px] font-bold text-[#2b2824] block truncate">{c.name}</span>
+                          <p className="text-xs font-bold font-mono text-emerald-800 mt-1">{formatCurrency(c.total)}</p>
+                          <span className="text-[10px] text-[#6b645c]">{c.count} reg. ({c.pct.toFixed(0)}%)</span>
                         </div>
                       ))}
                     </div>
-                  )}
+                  </div>
+                </div>
+              )}
 
-                  {/* Load More Button */}
-                  {filteredEgresosFeed.length > egresosDisplayLimit && (
-                    <div className="p-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/60 text-center">
-                      <button
-                        onClick={() => setEgresosDisplayLimit(prev => prev + 15)}
-                        className="text-xs font-bold text-[#8b7355] hover:text-[#705b42] transition-colors"
-                      >
-                        Mostrar más ({filteredEgresosFeed.length - egresosDisplayLimit} restantes)
-                      </button>
+              {(viewMode === 'todos' || viewMode === 'egresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
+                      <Layers size={13} className="text-rose-700" />
+                      <span>Egresos por Sector Productivo</span>
+                    </h5>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {egresosBySubactividad.map(s => (
+                        <div key={s.name} className="p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block mb-1 truncate ${getSubactividadBadgeClass(s.name)}`}>
+                            {s.name}
+                          </span>
+                          <p className="text-xs font-bold font-mono text-rose-800">{formatCurrency(s.total)}</p>
+                          <span className="text-[10px] text-[#6b645c]">{s.pct.toFixed(0)}% del total</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Row 4: Movimientos de Ingreso vs Movimientos de Egreso */}
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+              {(viewMode === 'todos' || viewMode === 'ingresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] shadow-sm overflow-hidden h-full flex flex-col justify-between">
+                  <div className="flex-1 flex flex-col">
+                    <div className="px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex items-center justify-between">
+                      <div>
+                        <h5 className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Movimientos de Ingreso</h5>
+                        <p className="text-[11px] text-[#6b645c]">Registro simplificado de cobros</p>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200">
+                        {filteredIngresosFeed.length} operaciones
+                      </span>
+                    </div>
+
+                    {filteredIngresosFeed.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-[#8c827a] italic my-auto">
+                        No se encontraron ingresos con los filtros y fechas seleccionadas.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-[#e0d6c8]/60 flex-1">
+                        {paginatedIngresos.map((item, idx) => (
+                          <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-mono font-bold text-[#8b7355] bg-[#f4ebd8] px-1.5 py-0.5 rounded">
+                                  {item.Fecha}
+                                </span>
+                                <span className="font-bold text-xs text-[#2b2824] truncate">
+                                  {item['Prov/Cliente'] || 'Cliente'}
+                                </span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getCuentaBadgeClass(item.Cuenta)}`}>
+                                  {item.Cuenta || 'N/A'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center space-x-2 text-[11px] text-[#6b645c] mt-0.5 truncate">
+                                <span className="font-medium text-[#4a453e]">{item.Rubro || 'Sin Rubro'}</span>
+                                {item['Subrubro/Producto'] && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{item['Subrubro/Producto']}</span>
+                                  </>
+                                )}
+                                {item.Observaciones && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="italic text-[#8c827a] truncate max-w-[140px] sm:max-w-[200px]">{item.Observaciones}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right whitespace-nowrap">
+                              <span className="font-mono font-bold text-sm text-emerald-700">
+                                +{formatCurrency(parseCurrency(item.Ingresos))}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Standard Pagination Controls for Ingresos */}
+                  {filteredIngresosFeed.length > 0 && (
+                    <div className="px-3 sm:px-4 py-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/70 flex flex-wrap items-center justify-between gap-2 text-xs text-[#6b645c]">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[11px]">Ver:</span>
+                        <select
+                          value={ingresosPerPage}
+                          onChange={(e) => {
+                            setIngresosPerPage(Number(e.target.value));
+                            setIngresosPage(1);
+                          }}
+                          className="px-2 py-0.5 bg-white border border-[#e0d6c8] rounded text-xs font-bold text-[#2b2824] outline-none"
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                        </select>
+                        <span className="text-[11px]">por pág.</span>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[11px]">
+                          Pág. <strong className="text-[#2b2824]">{ingresosPage}</strong> de <strong className="text-[#2b2824]">{totalIngresosPages}</strong>
+                        </span>
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() => setIngresosPage(prev => Math.max(1, prev - 1))}
+                            disabled={ingresosPage === 1}
+                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            title="Página anterior"
+                          >
+                            <ChevronLeft size={14} />
+                          </button>
+                          <button
+                            onClick={() => setIngresosPage(prev => Math.min(totalIngresosPages, prev + 1))}
+                            disabled={ingresosPage === totalIngresosPages}
+                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            title="Página siguiente"
+                          >
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
+              )}
 
-              </div>
-            )}
+              {(viewMode === 'todos' || viewMode === 'egresos') && (
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] shadow-sm overflow-hidden h-full flex flex-col justify-between">
+                  <div className="flex-1 flex flex-col">
+                    <div className="px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex items-center justify-between">
+                      <div>
+                        <h5 className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Movimientos de Egreso</h5>
+                        <p className="text-[11px] text-[#6b645c]">Registro simplificado de gastos</p>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-50 text-rose-800 rounded border border-rose-200">
+                        {filteredEgresosFeed.length} gastos
+                      </span>
+                    </div>
+
+                    {filteredEgresosFeed.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-[#8c827a] italic my-auto">
+                        No se encontraron egresos con los filtros y fechas seleccionadas.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-[#e0d6c8]/60 flex-1">
+                        {paginatedEgresos.map((item, idx) => (
+                          <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-mono font-bold text-[#8b7355] bg-[#f4ebd8] px-1.5 py-0.5 rounded">
+                                  {item.Fecha}
+                                </span>
+                                <span className="font-bold text-xs text-[#2b2824] truncate">
+                                  {item['Prov/Cliente'] || 'Proveedor'}
+                                </span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getSubactividadBadgeClass(item.Subactividad)}`}>
+                                  {item.Subactividad || 'COMUN'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center space-x-2 text-[11px] text-[#6b645c] mt-0.5 truncate">
+                                <span className="font-medium text-[#4a453e]">{item.Rubro || 'Sin Rubro'}</span>
+                                {item['Subrubro/Producto'] && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{item['Subrubro/Producto']}</span>
+                                  </>
+                                )}
+                                {item.Observaciones && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="italic text-[#8c827a] truncate max-w-[140px] sm:max-w-[200px]">{item.Observaciones}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right whitespace-nowrap">
+                              <span className="font-mono font-bold text-sm text-rose-700">
+                                -{formatCurrency(parseCurrency(item.Egresos))}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Standard Pagination Controls for Egresos */}
+                  {filteredEgresosFeed.length > 0 && (
+                    <div className="px-3 sm:px-4 py-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/70 flex flex-wrap items-center justify-between gap-2 text-xs text-[#6b645c]">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[11px]">Ver:</span>
+                        <select
+                          value={egresosPerPage}
+                          onChange={(e) => {
+                            setEgresosPerPage(Number(e.target.value));
+                            setEgresosPage(1);
+                          }}
+                          className="px-2 py-0.5 bg-white border border-[#e0d6c8] rounded text-xs font-bold text-[#2b2824] outline-none"
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                        </select>
+                        <span className="text-[11px]">por pág.</span>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[11px]">
+                          Pág. <strong className="text-[#2b2824]">{egresosPage}</strong> de <strong className="text-[#2b2824]">{totalEgresosPages}</strong>
+                        </span>
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() => setEgresosPage(prev => Math.max(1, prev - 1))}
+                            disabled={egresosPage === 1}
+                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            title="Página anterior"
+                          >
+                            <ChevronLeft size={14} />
+                          </button>
+                          <button
+                            onClick={() => setEgresosPage(prev => Math.min(totalEgresosPages, prev + 1))}
+                            disabled={egresosPage === totalEgresosPages}
+                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            title="Página siguiente"
+                          >
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
           </div>
 
