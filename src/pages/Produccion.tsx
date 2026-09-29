@@ -74,7 +74,11 @@ const Produccion = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await addRecord(formData);
+    const cleanFormData = {
+      ...formData,
+      tipo_queso: formData.tipo_queso ? formData.tipo_queso.trim().toUpperCase() : ''
+    };
+    const success = await addRecord(cleanFormData);
     if (success) {
       setIsModalOpen(false);
       setFormData({
@@ -206,14 +210,19 @@ const Produccion = () => {
       const mermaPct = Math.min((diffDays / 60) * 0.20, 0.35);
       const currentKg = Number(row.kg_totales) * (1 - mermaPct);
 
-      const tipo = row.tipo_queso && row.tipo_queso.trim() !== '' ? row.tipo_queso.trim() : 'Sin Variedad';
-      const key = `${row.producto}-${tipo}`;
+      const rawTipo = row.tipo_queso && row.tipo_queso.trim() !== '' ? row.tipo_queso.trim() : (row.producto || 'Sin Variedad');
+      const tipoUpper = rawTipo.toUpperCase();
+      const category = (tipoUpper === 'PECORINO' || tipoUpper === 'PROVOLETA') ? 'DURO'
+        : (tipoUpper === 'MANCHEGO' || tipoUpper === 'SABORIZADO' || tipoUpper === 'AHUMADO') ? 'SEMIDURO'
+        : (tipoUpper === 'RICOTA') ? 'RICOTA'
+        : (row.producto ? row.producto.toUpperCase() : 'DURO');
+      const key = `${category}-${tipoUpper}`;
       
       if (!map.has(key)) {
         map.set(key, { 
           id: key,
-          producto: row.producto, 
-          variedad: tipo, 
+          producto: category, 
+          variedad: tipoUpper, 
           kg_original: 0, 
           kg_estimado: 0,
           lotes: []

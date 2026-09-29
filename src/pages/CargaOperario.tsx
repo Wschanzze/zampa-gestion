@@ -16,6 +16,7 @@ const CargaOperario: React.FC = () => {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [litros, setLitros] = useState('');
   const [producto, setProducto] = useState('PECORINO');
+  const [tipoPasta, setTipoPasta] = useState('DURO');
   
   const [quesoGrande, setQuesoGrande] = useState('');
   const [quesoBarra, setQuesoBarra] = useState('');
@@ -49,14 +50,15 @@ const CargaOperario: React.FC = () => {
     
     // Generar un lote base temporal si es necesario
     const [year, month, day] = fecha.split('-');
-    const loteCalculado = `${day}${month}${year.substring(2)}-${producto.substring(0,3)}`;
+    const pUpper = producto.trim().toUpperCase();
+    const loteCalculado = `${day}${month}${year.substring(2)}-${pUpper.substring(0,3)}`;
 
     const success = await addRecord({
       fecha_elaboracion: fecha,
       lote: loteCalculado,
       litros_leche: parseDecimalNumber(litros),
-      producto: 'DURO', // Can abstract this based on type, but match main logic
-      tipo_queso: producto,
+      producto: tipoPasta.trim().toUpperCase(),
+      tipo_queso: pUpper,
       cantidad_grande: quesoGrande ? parseInt(quesoGrande) : 0,
       cantidad_barra: quesoBarra ? parseInt(quesoBarra) : 0,
       cantidad_tubo: quesoTubo ? parseInt(quesoTubo) : 0,
@@ -186,22 +188,58 @@ const CargaOperario: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-[#3e3a35] mb-2 uppercase tracking-wide">
-              Variedad / Producto
-            </label>
-            <select
-              value={producto}
-              onChange={(e) => setProducto(e.target.value)}
-              className="w-full bg-[#fdfdfc] border-2 border-[#e0d6c8] rounded-xl p-3.5 text-lg font-bold text-[#3e3a35] focus:border-[#8b7355] outline-none"
-            >
-              <option value="PECORINO">Pecorino</option>
-              <option value="MANCHEGO">Manchego</option>
-              <option value="SABORIZADO">Saborizado</option>
-              <option value="AHUMADO">Ahumado</option>
-              <option value="PROVOLETA">Provoleta</option>
-              <option value="RICOTA">Ricota</option>
-            </select>
+          {/* Variedad y Tipo de Pasta */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-[#3e3a35] mb-2 uppercase tracking-wide">
+                Variedad / Producto
+              </label>
+              <select
+                value={producto}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setProducto(val);
+                  // Sugerir automáticamente el tipo de pasta según la variedad
+                  if (val === 'PECORINO' || val === 'PROVOLETA') {
+                    setTipoPasta('DURO');
+                  } else if (val === 'RICOTA') {
+                    setTipoPasta('RICOTA');
+                  } else {
+                    setTipoPasta('SEMIDURO');
+                  }
+                }}
+                className="w-full bg-[#fdfdfc] border-2 border-[#e0d6c8] rounded-xl p-3.5 text-lg font-bold text-[#3e3a35] focus:border-[#8b7355] outline-none uppercase"
+                style={{ textTransform: 'uppercase' }}
+              >
+                <option value="PECORINO" className="uppercase font-bold">PECORINO</option>
+                <option value="MANCHEGO" className="uppercase font-bold">MANCHEGO</option>
+                <option value="SABORIZADO" className="uppercase font-bold">SABORIZADO</option>
+                <option value="AHUMADO" className="uppercase font-bold">AHUMADO</option>
+                <option value="PROVOLETA" className="uppercase font-bold">PROVOLETA</option>
+                <option value="RICOTA" className="uppercase font-bold">RICOTA</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-[#3e3a35] mb-2 uppercase tracking-wide">
+                Tipo de Pasta (Categoría)
+              </label>
+              <select
+                value={tipoPasta}
+                onChange={(e) => setTipoPasta(e.target.value.toUpperCase())}
+                className="w-full bg-[#fdfdfc] border-2 border-[#e0d6c8] rounded-xl p-3.5 text-lg font-bold text-[#3e3a35] focus:border-[#8b7355] outline-none uppercase"
+                style={{ textTransform: 'uppercase' }}
+              >
+                <option value="DURO" className="uppercase font-bold">PASTA DURA (DURO)</option>
+                <option value="SEMIDURO" className="uppercase font-bold">PASTA SEMIDURA (SEMIDURO)</option>
+                <option value="BLANDO" className="uppercase font-bold">PASTA BLANDA (BLANDO)</option>
+                <option value="RICOTA" className="uppercase font-bold">RICOTA</option>
+                <option value="OTRO" className="uppercase font-bold">OTRO</option>
+              </select>
+              <span className="text-[11px] text-[#8b7355] font-semibold mt-1 block">
+                Podés cambiar manualmente el tipo de pasta si este lote corresponde a otra categoría.
+              </span>
+            </div>
           </div>
 
           <div className="pt-2">
@@ -256,7 +294,14 @@ const CargaOperario: React.FC = () => {
               {ultimasCargas.map(carga => (
                 <div key={carga.id} className="flex justify-between items-center p-3 rounded-xl bg-[#faf9f6] border border-[#e0d6c8]">
                   <div>
-                    <p className="text-sm font-black text-[#3e3a35]">{carga.producto}</p>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm font-black text-[#3e3a35] uppercase">{carga.tipo_queso || carga.producto}</p>
+                      {carga.producto && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f4ebd8] text-[#8b7355] border border-[#e0d6c8] uppercase">
+                          {carga.producto}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-[#6b645c] mt-0.5">
                       {carga.kg_totales} kg / {carga.litros_leche} Lts ({carga.fecha_elaboracion})
                     </p>
