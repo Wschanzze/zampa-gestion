@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ComboboxSelect from './ComboboxSelect';
+import { normalizeDecimal, parseDecimalNumber } from '../utils/calculations';
 // @ts-ignore
 import { X, CheckCircle, ArrowDownLeft, ArrowUpRight, DollarSign } from 'lucide-react';
 
@@ -40,7 +41,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const [entity, setEntity] = useState(initialEntity);
   const [type, setType] = useState<'COBRO_CLIENTE' | 'PAGO_PROVEEDOR'>(initialType);
-  const [amount, setAmount] = useState<number | ''>('');
+  const [amount, setAmount] = useState<string>('');
   const [account, setAccount] = useState('BANCO');
   const [date, setDate] = useState(new Date().toLocaleDateString('es-AR'));
   const [notes, setNotes] = useState('');
@@ -60,7 +61,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handleFillTotal = () => {
     if (Math.abs(currentPending) > 0) {
-      setAmount(Math.abs(currentPending));
+      setAmount(String(Math.abs(currentPending)));
     }
   };
 
@@ -70,7 +71,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       alert('Por favor especifica un cliente o proveedor');
       return;
     }
-    if (!amount || amount <= 0) {
+    const numAmount = parseDecimalNumber(amount);
+    if (numAmount <= 0) {
       alert('El monto a registrar debe ser mayor a cero');
       return;
     }
@@ -78,7 +80,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setSubmitting(true);
     const success = await onRegister({
       entity: entity.trim(),
-      amount: Number(amount),
+      amount: numAmount,
       type,
       account,
       date,
@@ -195,11 +197,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span className="absolute left-3 top-2 text-[#6b645c] font-bold text-sm">$</span>
                 <input 
                   required
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="0.00"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  onChange={(e) => setAmount(normalizeDecimal(e.target.value))}
                   className="w-full pl-7 pr-3 py-2 border border-[#e0d6c8] bg-white rounded-lg text-sm text-[#3e3a35] font-bold outline-none focus:ring-1 focus:ring-[#8b7355]"
                 />
               </div>

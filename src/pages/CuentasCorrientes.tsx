@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Transaction } from '../utils/calculations';
 import { calculatePendientes, parseCurrency } from '../utils/calculations';
+import { useListas } from '../lib/api';
 import PaymentModal from '../components/PaymentModal';
 // @ts-ignore
 import { Search, PlusCircle, ArrowDownLeft, ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, History, Download } from 'lucide-react';
@@ -19,6 +20,22 @@ interface CuentasCorrientesProps {
   }) => Promise<boolean | void>;
 }
 
+// Robust date parser for es-AR "D/M/YYYY" or ISO formats
+const parseFechaToTime = (fechaStr?: string): number => {
+  if (!fechaStr) return 0;
+  if (fechaStr.includes('/')) {
+    const parts = fechaStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10) || 0;
+      const month = (parseInt(parts[1], 10) || 1) - 1;
+      const year = parseInt(parts[2], 10) || 0;
+      return new Date(year, month, day).getTime();
+    }
+  }
+  const t = new Date(fechaStr).getTime();
+  return isNaN(t) ? 0 : t;
+};
+
 const formatCurrency = (val: number) => {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -35,10 +52,12 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedEntity, setExpandedEntity] = useState<string | null>(null);
 
-  // Compute pending balances for all entities
+  const { entidades } = useListas();
+
+  // Compute pending balances for all entities (all Prov/Cliente in data + database entidades)
   const pendientes = useMemo(() => {
-    return calculatePendientes(data);
-  }, [data]);
+    return calculatePendientes(data, entidades.map(e => e.nombre));
+  }, [data, entidades]);
 
   // Overall totals
   const totalACobrar = useMemo(() => {
@@ -54,7 +73,9 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
   // Filtered list of entities
   const filteredEntities = useMemo(() => {
     return pendientes.filter(item => {
-      const matchSearch = searchTerm === '' || item.entity.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = searchTerm === '' || 
+        item.entity.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.tipo.toLowerCase().includes(searchTerm.toLowerCase());
       
       let matchFilter = true;
       if (filterType === 'CLIENTES') matchFilter = item.saldo > 0;
@@ -62,7 +83,14 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
       if (filterType === 'SALDADOS') matchFilter = item.saldo === 0;
 
       return matchSearch && matchFilter;
-    }).sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo));
+    }).sort((a, b) => {
+      const absA = Math.abs(a.saldo);
+      const absB = Math.abs(b.saldo);
+      if (absA !== absB) {
+        return absB - absA;
+      }
+      return a.entity.localeCompare(b.entity, 'es', { sensitivity: 'base' });
+    });
   }, [pendientes, searchTerm, filterType]);
 
   const handleOpenPayment = (entityName: string, isCliente: boolean) => {
@@ -81,28 +109,13 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
   const entityHistory = useMemo(() => {
     if (!expandedEntity) return [];
     return data.filter(d => d['Prov/Cliente']?.toLowerCase().trim() === expandedEntity.toLowerCase().trim())
-      .sort((a, b) => {
-        // Compare dates (D/M/YYYY)
-        const parseD = (str: string) => {
-          const parts = str?.split('/');
-          if (parts && parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
-          return 0;
-        };
-        return parseD(a.Fecha) - parseD(b.Fecha);
-      });
+      .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
   }, [data, expandedEntity]);
 
   const handleExportPDF = (entityName: string, entitySaldo: number) => {
     // 1. Get history for this entity
     const history = data.filter(d => d['Prov/Cliente']?.toLowerCase().trim() === entityName.toLowerCase().trim())
-      .sort((a, b) => {
-        const parseD = (str: string) => {
-          const parts = str?.split('/');
-          if (parts && parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
-          return 0;
-        };
-        return parseD(a.Fecha) - parseD(b.Fecha);
-      });
+      .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
 
     // 2. Create a temporary div element for PDF generation
     const container = document.createElement('div');
@@ -288,7 +301,7 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
         <div className="flex p-1 bg-[#eae0cd]/60 rounded-xl border border-[#e0d6c8] text-xs font-semibold overflow-x-auto max-w-full whitespace-nowrap">
           <button
             onClick={() => setFilterType('TODOS')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'TODOS' ? 'bg-white text-[#3e3a35] shadow-xs' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
+            className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'TODOS' ? 'bg-white text-[#3e3a35] shadow-xs font-bold' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
           >
             Todos ({pendientes.length})
           </button>
@@ -296,19 +309,19 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
             onClick={() => setFilterType('CLIENTES')}
             className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'CLIENTES' ? 'bg-white text-emerald-800 shadow-xs font-bold' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
           >
-            Clientes ({pendientes.filter(p => p.saldo > 0).length})
+            Clientes a Cobrar ({pendientes.filter(p => p.saldo > 0).length})
           </button>
           <button
             onClick={() => setFilterType('PROVEEDORES')}
             className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'PROVEEDORES' ? 'bg-white text-rose-800 shadow-xs font-bold' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
           >
-            Proveedores ({pendientes.filter(p => p.saldo < 0).length})
+            Proveedores a Pagar ({pendientes.filter(p => p.saldo < 0).length})
           </button>
           <button
             onClick={() => setFilterType('SALDADOS')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'SALDADOS' ? 'bg-white text-[#3e3a35] shadow-xs' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
+            className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'SALDADOS' ? 'bg-white text-[#3e3a35] shadow-xs font-bold' : 'text-[#6b645c] hover:text-[#2d2a26]'}`}
           >
-            Saldados ($0)
+            Al Día / Saldados ({pendientes.filter(p => p.saldo === 0).length})
           </button>
         </div>
 
@@ -365,9 +378,21 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                             ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                             : isProveedor 
                             ? 'bg-rose-50 text-rose-800 border-rose-200' 
+                            : row.tipo === 'CLIENTE'
+                            ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200'
+                            : row.tipo === 'PROVEEDOR'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
                             : 'bg-gray-100 text-gray-700 border-gray-200'
                         }`}>
-                          {isCliente ? 'CLIENTE' : isProveedor ? 'PROVEEDOR' : 'AL DÍA'}
+                          {isCliente 
+                            ? 'CLIENTE (A COBRAR)' 
+                            : isProveedor 
+                            ? 'PROVEEDOR (A PAGAR)' 
+                            : row.tipo === 'CLIENTE'
+                            ? 'CLIENTE • AL DÍA'
+                            : row.tipo === 'PROVEEDOR'
+                            ? 'PROVEEDOR • AL DÍA'
+                            : 'AL DÍA'}
                         </span>
                       </td>
 
@@ -386,14 +411,14 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                         <span className={isCliente ? 'text-emerald-700' : isProveedor ? 'text-rose-700' : 'text-[#6b645c]'}>
                           {isCliente && '+ '}
                           {isProveedor && '- '}
-                          {formatCurrency(Math.abs(row.saldo))}
+                          {row.saldo === 0 ? '$0' : formatCurrency(Math.abs(row.saldo))}
                         </span>
                       </td>
 
                       {/* Actions */}
                       <td className="px-4 py-3.5 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center space-x-2">
-                          {!isSaldado && (
+                          {!isSaldado ? (
                             <button
                               onClick={() => handleOpenPayment(row.entity, isCliente)}
                               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1 ${
@@ -403,6 +428,14 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                               }`}
                             >
                               <span>{isCliente ? 'Cobrar Deuda' : 'Pagar Deuda'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenPayment(row.entity, row.tipo !== 'PROVEEDOR')}
+                              className="px-2.5 py-1 text-xs border border-[#e0d6c8] text-[#5c544d] hover:bg-[#f4ebd8] rounded-lg font-semibold transition-colors flex items-center space-x-1 bg-white"
+                              title="Registrar cobro o pago"
+                            >
+                              <span>Cobro / Pago</span>
                             </button>
                           )}
                           <button

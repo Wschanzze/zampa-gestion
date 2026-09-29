@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Transaction } from '../utils/calculations';
+import { normalizeDecimal, parseDecimalNumber } from '../utils/calculations';
 import { useListas } from '../lib/api';
 import ComboboxSelect from './ComboboxSelect';
 // @ts-ignore
@@ -98,18 +99,28 @@ const TransactionForm: React.FC<Props> = ({
     }
   }, [initialData]);
 
+  const displayValue = (val: any) => {
+    if (val === 0 || val === undefined || val === null) return '';
+    return String(val);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleDecimalChange = (name: string, rawValue: string) => {
+    const value = normalizeDecimal(rawValue);
     const cheeseFields = ['Pecorino', 'Manchego', 'Saborizado', 'Ahumado', 'Provoleta', 'Ricota'];
 
     if (cheeseFields.includes(name)) {
       const updated = { ...formData, [name]: value };
-      const p = Number(name === 'Pecorino' ? value : updated.Pecorino) || 0;
-      const m = Number(name === 'Manchego' ? value : updated.Manchego) || 0;
-      const s = Number(name === 'Saborizado' ? value : updated.Saborizado) || 0;
-      const a = Number(name === 'Ahumado' ? value : updated.Ahumado) || 0;
-      const pr = Number(name === 'Provoleta' ? value : updated.Provoleta) || 0;
-      const r = Number(name === 'Ricota' ? value : updated.Ricota) || 0;
+      const p = parseDecimalNumber(name === 'Pecorino' ? value : updated.Pecorino);
+      const m = parseDecimalNumber(name === 'Manchego' ? value : updated.Manchego);
+      const s = parseDecimalNumber(name === 'Saborizado' ? value : updated.Saborizado);
+      const a = parseDecimalNumber(name === 'Ahumado' ? value : updated.Ahumado);
+      const pr = parseDecimalNumber(name === 'Provoleta' ? value : updated.Provoleta);
+      const r = parseDecimalNumber(name === 'Ricota' ? value : updated.Ricota);
       const totalCheese = parseFloat((p + m + s + a + pr + r).toFixed(2));
 
       setFormData({
@@ -123,7 +134,7 @@ const TransactionForm: React.FC<Props> = ({
   };
 
   const handleMontoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value) || 0;
+    const val = normalizeDecimal(e.target.value);
     if (tipoMovimiento === 'INGRESO') {
       setFormData(prev => ({ ...prev, Ingresos: val, Egresos: 0 }));
     } else {
@@ -133,12 +144,12 @@ const TransactionForm: React.FC<Props> = ({
 
   // Calculate total cheese weight
   const totalKgQuesos = useMemo(() => {
-    const p = Number(formData.Pecorino) || 0;
-    const m = Number(formData.Manchego) || 0;
-    const s = Number(formData.Saborizado) || 0;
-    const a = Number(formData.Ahumado) || 0;
-    const pr = Number(formData.Provoleta) || 0;
-    const r = Number(formData.Ricota) || 0;
+    const p = parseDecimalNumber(formData.Pecorino);
+    const m = parseDecimalNumber(formData.Manchego);
+    const s = parseDecimalNumber(formData.Saborizado);
+    const a = parseDecimalNumber(formData.Ahumado);
+    const pr = parseDecimalNumber(formData.Provoleta);
+    const r = parseDecimalNumber(formData.Ricota);
     return parseFloat((p + m + s + a + pr + r).toFixed(2));
   }, [formData.Pecorino, formData.Manchego, formData.Saborizado, formData.Ahumado, formData.Provoleta, formData.Ricota]);
 
@@ -149,23 +160,23 @@ const TransactionForm: React.FC<Props> = ({
       return;
     }
 
-    const p = Number(formData.Pecorino) || 0;
-    const m = Number(formData.Manchego) || 0;
-    const s = Number(formData.Saborizado) || 0;
-    const a = Number(formData.Ahumado) || 0;
-    const pr = Number(formData.Provoleta) || 0;
-    const r = Number(formData.Ricota) || 0;
+    const p = parseDecimalNumber(formData.Pecorino);
+    const m = parseDecimalNumber(formData.Manchego);
+    const s = parseDecimalNumber(formData.Saborizado);
+    const a = parseDecimalNumber(formData.Ahumado);
+    const pr = parseDecimalNumber(formData.Provoleta);
+    const r = parseDecimalNumber(formData.Ricota);
     const calculatedCheeseTotal = parseFloat((p + m + s + a + pr + r).toFixed(2));
 
     const finalCantidades = calculatedCheeseTotal > 0 
       ? calculatedCheeseTotal 
-      : (Number(formData.Cantidades) || 0);
+      : parseDecimalNumber(formData.Cantidades);
 
     const finalData: Transaction = {
       ...formData,
       Fecha: formData.Fecha,
-      Ingresos: tipoMovimiento === 'INGRESO' ? (Number(formData.Ingresos) || 0) : 0,
-      Egresos: tipoMovimiento === 'EGRESO' ? (Number(formData.Egresos) || 0) : 0,
+      Ingresos: tipoMovimiento === 'INGRESO' ? parseDecimalNumber(formData.Ingresos) : 0,
+      Egresos: tipoMovimiento === 'EGRESO' ? parseDecimalNumber(formData.Egresos) : 0,
       Cantidades: finalCantidades,
       Pecorino: p,
       Manchego: m,
@@ -317,11 +328,10 @@ const TransactionForm: React.FC<Props> = ({
                 {tipoMovimiento === 'INGRESO' ? 'Monto Ingreso ($)' : 'Monto Egreso ($)'}
               </label>
               <input 
-                type="number" 
-                step="0.01" 
+                type="text" 
                 inputMode="decimal"
                 placeholder="0.00"
-                value={(tipoMovimiento === 'INGRESO' ? formData.Ingresos : formData.Egresos) || ''} 
+                value={displayValue(tipoMovimiento === 'INGRESO' ? formData.Ingresos : formData.Egresos)} 
                 onChange={handleMontoChange} 
                 className={`w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2.5 text-base md:text-sm font-bold outline-none focus:ring-1 ${
                   tipoMovimiento === 'INGRESO' ? 'text-emerald-700 focus:ring-emerald-500' : 'text-rose-700 focus:ring-rose-500'
@@ -342,13 +352,12 @@ const TransactionForm: React.FC<Props> = ({
                 )}
               </div>
               <input 
-                type="number" 
-                step="0.01" 
+                type="text" 
                 inputMode="decimal"
                 name="Cantidades" 
                 placeholder="0.00"
-                value={formData.Cantidades || ''} 
-                onChange={handleChange} 
+                value={displayValue(formData.Cantidades)} 
+                onChange={(e) => handleDecimalChange('Cantidades', e.target.value)} 
                 className={`w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2.5 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none font-bold ${
                   totalKgQuesos > 0 ? 'bg-amber-50/40 border-amber-300 text-amber-950' : ''
                 }`} 
@@ -373,89 +382,27 @@ const TransactionForm: React.FC<Props> = ({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-amber-950 mb-1">Pecorino (kg)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  inputMode="decimal"
-                  name="Pecorino" 
-                  placeholder="0.00"
-                  value={formData.Pecorino || ''} 
-                  onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-amber-950 mb-1">Manchego (kg)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  inputMode="decimal"
-                  name="Manchego" 
-                  placeholder="0.00"
-                  value={formData.Manchego || ''} 
-                  onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-amber-950 mb-1">Saborizado (kg)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  inputMode="decimal"
-                  name="Saborizado" 
-                  placeholder="0.00"
-                  value={formData.Saborizado || ''} 
-                  onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-amber-950 mb-1">Ahumado (kg)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  inputMode="decimal"
-                  name="Ahumado" 
-                  placeholder="0.00"
-                  value={formData.Ahumado || ''} 
-                  onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-amber-950 mb-1">Provoleta (kg)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  inputMode="decimal"
-                  name="Provoleta" 
-                  placeholder="0.00"
-                  value={formData.Provoleta || ''} 
-                  onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-amber-950 mb-1">Ricota (kg)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  inputMode="decimal"
-                  name="Ricota" 
-                  placeholder="0.00"
-                  value={formData.Ricota || ''} 
-                  onChange={handleChange} 
-                  className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
-                />
-              </div>
+              {[
+                { name: 'Pecorino', label: 'Pecorino (kg)' },
+                { name: 'Manchego', label: 'Manchego (kg)' },
+                { name: 'Saborizado', label: 'Saborizado (kg)' },
+                { name: 'Ahumado', label: 'Ahumado (kg)' },
+                { name: 'Provoleta', label: 'Provoleta (kg)' },
+                { name: 'Ricota', label: 'Ricota (kg)' },
+              ].map(({ name, label }) => (
+                <div key={name}>
+                  <label className="block text-[11px] font-semibold text-amber-950 mb-1">{label}</label>
+                  <input 
+                    type="text" 
+                    inputMode="decimal"
+                    name={name} 
+                    placeholder="0.00"
+                    value={displayValue(formData[name as keyof Transaction])} 
+                    onChange={(e) => handleDecimalChange(name, e.target.value)} 
+                    className="w-full border border-amber-200 bg-white rounded-lg px-2.5 py-2 text-base md:text-xs text-[#3e3a35] focus:ring-1 focus:ring-amber-600 outline-none font-mono" 
+                  />
+                </div>
+              ))}
             </div>
           </div>
 

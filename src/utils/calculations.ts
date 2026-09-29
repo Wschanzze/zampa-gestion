@@ -25,6 +25,30 @@ export const parseCurrency = (val: string | number | undefined): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+export const normalizeDecimal = (val: string): string => {
+  if (!val) return '';
+  // Convert commas to periods
+  let cleaned = val.replace(/,/g, '.');
+  // Allow only digits and periods
+  cleaned = cleaned.replace(/[^0-9.]/g, '');
+  // If starts with period, prepend 0
+  if (cleaned === '.') return '0.';
+  // Allow only a single period
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  }
+  return cleaned;
+};
+
+export const parseDecimalNumber = (val: string | number | undefined | null): number => {
+  if (val === undefined || val === null || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const normalized = String(val).replace(/,/g, '.');
+  const num = parseFloat(normalized);
+  return isNaN(num) ? 0 : num;
+};
+
 export const calculateSummaryByUnit = (data: Transaction[]) => {
   const summary = {
     TAMBO: { ingresos: 0, egresos: 0, resultado: 0 },
@@ -57,28 +81,131 @@ export const calculateSummaryByUnit = (data: Transaction[]) => {
   return summary;
 };
 
-export const calculatePendientes = (data: Transaction[]) => {
-  const pendientes: Record<string, { cobrar: number; pagar: number; saldo: number }> = {};
-  
+export type PendingAccount = {
+  entity: string;
+  cobrar: number;
+  pagar: number;
+  saldo: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  movimientosCount: number;
+  tipo: 'CLIENTE' | 'PROVEEDOR' | 'AMBOS';
+};
+
+export const isTransactionPending = (row: Transaction): boolean => {
+  if (row.Cuenta?.toUpperCase() === 'PENDIENTE') return true;
+  if (
+    row.Observaciones && 
+    /pendiente/i.test(row.Observaciones) && 
+    !/no\s+pendiente|saldad/i.test(row.Observaciones)
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const calculatePendientes = (data: Transaction[], additionalEntities?: string[]): PendingAccount[] => {
+  const map: Record<string, {
+    cobrar: number;
+    pagar: number;
+    totalIngresos: number;
+    totalEgresos: number;
+    movimientosCount: number;
+    hasVenta: boolean;
+    hasCompra: boolean;
+  }> = {};
+
+  // 1. Process all transactions in data so that EVERY entity in Prov/Cliente is included
   data.forEach(row => {
-    if (row.Cuenta?.toUpperCase() === 'PENDIENTE') {
-      const entity = row['Prov/Cliente'] || 'Sin proveedor especificado';
-      const ingresos = parseCurrency(row.Ingresos);
-      const egresos = parseCurrency(row.Egresos);
-      
-      if (!pendientes[entity]) {
-        pendientes[entity] = { cobrar: 0, pagar: 0, saldo: 0 };
-      }
-      pendientes[entity].cobrar += ingresos;
-      pendientes[entity].pagar += egresos;
-      pendientes[entity].saldo = pendientes[entity].cobrar - pendientes[entity].pagar;
+    const rawEntity = row['Prov/Cliente']?.trim();
+    if (!rawEntity) return;
+
+    if (!map[rawEntity]) {
+      map[rawEntity] = {
+        cobrar: 0,
+        pagar: 0,
+        totalIngresos: 0,
+        totalEgresos: 0,
+        movimientosCount: 0,
+        hasVenta: false,
+        hasCompra: false,
+      };
+    }
+
+    const item = map[rawEntity];
+    item.movimientosCount += 1;
+
+    const ingresos = parseCurrency(row.Ingresos);
+    const egresos = parseCurrency(row.Egresos);
+    item.totalIngresos += ingresos;
+    item.totalEgresos += egresos;
+
+    const rubroUpper = (row.Rubro || '').toUpperCase();
+    if (ingresos > 0 || rubroUpper.includes('VENTA')) {
+      item.hasVenta = true;
+    }
+    if (egresos > 0 || rubroUpper.includes('COMPRA') || rubroUpper.includes('GASTO') || rubroUpper.includes('PAGO')) {
+      item.hasCompra = true;
+    }
+
+    if (isTransactionPending(row)) {
+      item.cobrar += ingresos;
+      item.pagar += egresos;
     }
   });
 
-  return Object.entries(pendientes).map(([name, vals]) => ({
-    entity: name,
-    ...vals
-  }));
+  // 2. Also register any additional entities if provided (e.g. from zampa_entidades)
+  if (additionalEntities) {
+    additionalEntities.forEach(rawName => {
+      const name = rawName?.trim();
+      if (name && !map[name]) {
+        map[name] = {
+          cobrar: 0,
+          pagar: 0,
+          totalIngresos: 0,
+          totalEgresos: 0,
+          movimientosCount: 0,
+          hasVenta: false,
+          hasCompra: false,
+        };
+      }
+    });
+  }
+
+  // 3. Format and sort
+  const results: PendingAccount[] = Object.entries(map).map(([name, vals]) => {
+    const saldo = parseFloat((vals.cobrar - vals.pagar).toFixed(2));
+    
+    let tipo: 'CLIENTE' | 'PROVEEDOR' | 'AMBOS' = 'CLIENTE';
+    if (vals.hasVenta && vals.hasCompra) {
+      tipo = 'AMBOS';
+    } else if (vals.hasCompra || vals.totalEgresos > 0) {
+      tipo = 'PROVEEDOR';
+    } else {
+      tipo = 'CLIENTE';
+    }
+
+    return {
+      entity: name,
+      cobrar: parseFloat(vals.cobrar.toFixed(2)),
+      pagar: parseFloat(vals.pagar.toFixed(2)),
+      saldo,
+      totalIngresos: parseFloat(vals.totalIngresos.toFixed(2)),
+      totalEgresos: parseFloat(vals.totalEgresos.toFixed(2)),
+      movimientosCount: vals.movimientosCount,
+      tipo,
+    };
+  });
+
+  // Sort: active pending balances first (by magnitude), then zero balance alphabetically
+  return results.sort((a, b) => {
+    const absA = Math.abs(a.saldo);
+    const absB = Math.abs(b.saldo);
+    if (absA > 0 || absB > 0) {
+      return absB - absA;
+    }
+    return a.entity.localeCompare(b.entity, 'es', { sensitivity: 'base' });
+  });
 };
 
 export const getAvailableYears = (data: Transaction[]) => {

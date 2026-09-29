@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useProduccion } from '../lib/api';
+import { normalizeDecimal, parseDecimalNumber } from '../utils/calculations';
 // @ts-ignore
 import { Trash2, CheckCircle2, ChevronRight, Save } from 'lucide-react';
 
@@ -53,7 +54,7 @@ const CargaOperario: React.FC = () => {
     const success = await addRecord({
       fecha_elaboracion: fecha,
       lote: loteCalculado,
-      litros_leche: parseFloat(litros),
+      litros_leche: parseDecimalNumber(litros),
       producto: 'DURO', // Can abstract this based on type, but match main logic
       tipo_queso: producto,
       cantidad_grande: quesoGrande ? parseInt(quesoGrande) : 0,
@@ -63,7 +64,7 @@ const CargaOperario: React.FC = () => {
       cantidad_camambert: quesoCamembert ? parseInt(quesoCamembert) : 0,
       cantidad_otro: 0,
       cantidad_ricota: 0,
-      kg_totales: parseFloat(kgTotales)
+      kg_totales: parseDecimalNumber(kgTotales)
     });
 
     setIsSubmitting(false);
@@ -160,12 +161,12 @@ const CargaOperario: React.FC = () => {
                 Litros Proces.
               </label>
               <input 
-                type="number" 
+                type="text" 
                 inputMode="decimal"
                 required
                 placeholder="0"
                 value={litros}
-                onChange={(e) => setLitros(e.target.value)}
+                onChange={(e) => setLitros(normalizeDecimal(e.target.value))}
                 className="w-full bg-[#fcfbf9] border-2 border-blue-200 focus:border-blue-500 rounded-xl p-3.5 text-xl font-black text-center text-blue-900 outline-none"
               />
             </div>
@@ -174,12 +175,12 @@ const CargaOperario: React.FC = () => {
                 Kilos Totales
               </label>
               <input 
-                type="number" 
+                type="text" 
                 inputMode="decimal"
                 required
                 placeholder="0.0"
                 value={kgTotales}
-                onChange={(e) => setKgTotales(e.target.value)}
+                onChange={(e) => setKgTotales(normalizeDecimal(e.target.value))}
                 className="w-full bg-[#fcfbf9] border-2 border-emerald-200 focus:border-emerald-500 rounded-xl p-3.5 text-xl font-black text-center text-emerald-900 outline-none"
               />
             </div>
