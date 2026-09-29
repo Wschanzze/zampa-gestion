@@ -18,6 +18,29 @@ const CargaOperario: React.FC = () => {
   const [producto, setProducto] = useState('PECORINO');
   const [tipoPasta, setTipoPasta] = useState('DURO');
   
+  // Calcular el siguiente lote correlativo basado en los lotes numéricos existentes (ej: 48 -> 49)
+  const nextSequentialLote = React.useMemo(() => {
+    let max = 0;
+    historial.forEach(h => {
+      if (!h.lote) return;
+      const trimmed = String(h.lote).trim();
+      if (/^\d+$/.test(trimmed)) {
+        const n = parseInt(trimmed, 10);
+        if (n > max) max = n;
+      }
+    });
+    return max > 0 ? String(max + 1) : '1';
+  }, [historial]);
+
+  const [lote, setLote] = useState('');
+
+  // Pre-llenar con el siguiente lote sugerido si aún no se ingresó uno
+  React.useEffect(() => {
+    if (!lote && nextSequentialLote) {
+      setLote(nextSequentialLote);
+    }
+  }, [nextSequentialLote]);
+
   const [quesoGrande, setQuesoGrande] = useState('');
   const [quesoBarra, setQuesoBarra] = useState('');
   const [quesoTubo, setQuesoTubo] = useState('');
@@ -46,16 +69,18 @@ const CargaOperario: React.FC = () => {
       return;
     }
 
+    const finalLote = (lote || nextSequentialLote).trim();
+    if (!finalLote) {
+      alert('Por favor ingrese el número de lote.');
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Generar un lote base temporal si es necesario
-    const [year, month, day] = fecha.split('-');
     const pUpper = producto.trim().toUpperCase();
-    const loteCalculado = `${day}${month}${year.substring(2)}-${pUpper.substring(0,3)}`;
 
     const success = await addRecord({
       fecha_elaboracion: fecha,
-      lote: loteCalculado,
+      lote: finalLote,
       litros_leche: parseDecimalNumber(litros),
       producto: tipoPasta.trim().toUpperCase(),
       tipo_queso: pUpper,
@@ -72,7 +97,13 @@ const CargaOperario: React.FC = () => {
     setIsSubmitting(false);
 
     if (success) {
-      // Reset form
+      // Incrementar automáticamente para la siguiente carga si es numérico
+      const numLote = parseInt(finalLote, 10);
+      if (!isNaN(numLote)) {
+        setLote(String(numLote + 1));
+      } else {
+        setLote('');
+      }
       setLitros('');
       setQuesoGrande('');
       setQuesoBarra('');
@@ -80,7 +111,7 @@ const CargaOperario: React.FC = () => {
       setQuesoChico('');
       setQuesoCamembert('');
       setKgTotales('');
-      alert('¡Carga guardada con éxito!');
+      alert(`¡Carga del Lote ${finalLote} guardada con éxito!`);
     }
   };
 
@@ -144,17 +175,33 @@ const CargaOperario: React.FC = () => {
         {/* Formulario Principal */}
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-5 shadow-sm border border-[#e0d6c8] space-y-5">
           
-          <div>
-            <label className="block text-sm font-bold text-[#3e3a35] mb-2 uppercase tracking-wide">
-              Fecha
-            </label>
-            <input 
-              type="date" 
-              required
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className="w-full bg-[#fdfdfc] border-2 border-[#e0d6c8] rounded-xl p-3.5 text-lg font-bold text-[#3e3a35] focus:border-[#8b7355] outline-none"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-[#3e3a35] mb-2 uppercase tracking-wide">
+                Fecha
+              </label>
+              <input 
+                type="date" 
+                required
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                className="w-full bg-[#fdfdfc] border-2 border-[#e0d6c8] rounded-xl p-3.5 text-base sm:text-lg font-bold text-[#3e3a35] focus:border-[#8b7355] outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-[#3e3a35] mb-2 uppercase tracking-wide">
+                Nº de Lote
+              </label>
+              <input 
+                type="text" 
+                required
+                placeholder="Ej: 49"
+                value={lote}
+                onChange={(e) => setLote(e.target.value)}
+                className="w-full bg-[#fdfdfc] border-2 border-[#8b7355]/40 rounded-xl p-3.5 text-base sm:text-lg font-black text-center text-[#2b2824] focus:border-[#8b7355] outline-none"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -294,7 +341,10 @@ const CargaOperario: React.FC = () => {
               {ultimasCargas.map(carga => (
                 <div key={carga.id} className="flex justify-between items-center p-3 rounded-xl bg-[#faf9f6] border border-[#e0d6c8]">
                   <div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-gray-800 text-white">
+                        Lote #{carga.lote}
+                      </span>
                       <p className="text-sm font-black text-[#3e3a35] uppercase">{carga.tipo_queso || carga.producto}</p>
                       {carga.producto && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f4ebd8] text-[#8b7355] border border-[#e0d6c8] uppercase">

@@ -6,6 +6,7 @@ import {
   Scale, 
   Plus, 
   Trash2, 
+  Pencil,
   X, 
   Filter, 
   TrendingUp, 
@@ -34,8 +35,9 @@ import {
 } from 'recharts';
 
 const Produccion = () => {
-  const { data, loading, addRecord, deleteRecord } = useProduccion();
+  const { data, loading, addRecord, updateRecord, deleteRecord } = useProduccion();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [expandedStock, setExpandedStock] = useState<string | null>(null);
   
   // Date filters
@@ -56,6 +58,20 @@ const Produccion = () => {
     }
   };
 
+  // Calcular el siguiente lote correlativo basado en los registros numéricos existentes
+  const nextSequentialLote = useMemo(() => {
+    let max = 0;
+    data.forEach(r => {
+      if (!r.lote) return;
+      const trimmed = String(r.lote).trim();
+      if (/^\d+$/.test(trimmed)) {
+        const n = parseInt(trimmed, 10);
+        if (n > max) max = n;
+      }
+    });
+    return max > 0 ? String(max + 1) : '1';
+  }, [data]);
+
   const [formData, setFormData] = useState({
     fecha_elaboracion: new Date().toISOString().split('T')[0],
     lote: '',
@@ -72,19 +88,71 @@ const Produccion = () => {
     cantidad_ricota: 0
   });
 
+  const handleOpenNew = () => {
+    setEditingRecordId(null);
+    setFormData({
+      fecha_elaboracion: new Date().toISOString().split('T')[0],
+      lote: nextSequentialLote,
+      litros_leche: 0,
+      producto: 'SEMIDURO',
+      tipo_queso: '',
+      kg_totales: 0,
+      cantidad_grande: 0,
+      cantidad_barra: 0,
+      cantidad_tubo: 0,
+      cantidad_chico: 0,
+      cantidad_otro: 0,
+      cantidad_camambert: 0,
+      cantidad_ricota: 0
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (record: any) => {
+    setEditingRecordId(record.id);
+    setFormData({
+      fecha_elaboracion: record.fecha_elaboracion,
+      lote: String(record.lote || ''),
+      litros_leche: Number(record.litros_leche) || 0,
+      producto: record.producto || 'SEMIDURO',
+      tipo_queso: record.tipo_queso || '',
+      kg_totales: Number(record.kg_totales) || 0,
+      cantidad_grande: Number(record.cantidad_grande) || 0,
+      cantidad_barra: Number(record.cantidad_barra) || 0,
+      cantidad_tubo: Number(record.cantidad_tubo) || 0,
+      cantidad_chico: Number(record.cantidad_chico) || 0,
+      cantidad_otro: Number(record.cantidad_otro) || 0,
+      cantidad_camambert: Number(record.cantidad_camambert) || 0,
+      cantidad_ricota: Number(record.cantidad_ricota) || 0
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanFormData = {
       ...formData,
-      tipo_queso: formData.tipo_queso ? formData.tipo_queso.trim().toUpperCase() : ''
+      lote: String(formData.lote).trim(),
+      tipo_queso: formData.tipo_queso ? formData.tipo_queso.trim().toUpperCase() : '',
+      producto: formData.producto ? formData.producto.trim().toUpperCase() : 'SEMIDURO'
     };
-    const success = await addRecord(cleanFormData);
+
+    let success = false;
+    if (editingRecordId) {
+      success = await updateRecord(editingRecordId, cleanFormData);
+    } else {
+      success = await addRecord(cleanFormData);
+    }
+
     if (success) {
       setIsModalOpen(false);
+      setEditingRecordId(null);
       setFormData({
-        ...formData,
+        fecha_elaboracion: new Date().toISOString().split('T')[0],
         lote: '',
         litros_leche: 0,
+        producto: 'SEMIDURO',
+        tipo_queso: '',
         kg_totales: 0,
         cantidad_grande: 0,
         cantidad_barra: 0,
@@ -282,7 +350,7 @@ const Produccion = () => {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenNew}
             className="bg-[#8b7355] hover:bg-[#735f46] text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide uppercase text-sm"
           >
             <Plus size={18} strokeWidth={3} />
@@ -757,17 +825,26 @@ const Produccion = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`¿Seguro que deseas eliminar el lote ${row.lote}?`)) {
-                            deleteRecord(row.id!);
-                          }
-                        }}
-                        className="text-gray-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100"
-                        title="Eliminar registro"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <div className="flex items-center justify-center space-x-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(row)}
+                          className="text-[#8b7355] hover:text-[#2b2824] hover:bg-[#f4ebd8] transition-colors p-1.5 rounded-lg"
+                          title={`Editar lote ${row.lote}`}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`¿Seguro que deseas eliminar el lote ${row.lote}?`)) {
+                              deleteRecord(row.id!);
+                            }
+                          }}
+                          className="text-gray-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                          title="Eliminar registro"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -816,11 +893,14 @@ const Produccion = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 border-b border-[#e0d6c8] bg-[#f4ebd8]">
               <h2 className="text-xl font-bold text-[#2b2824] flex items-center gap-2">
-                <Plus size={20} className="text-[#8b7355]" />
-                Registrar Nuevo Lote
+                {editingRecordId ? <Pencil size={20} className="text-[#8b7355]" /> : <Plus size={20} className="text-[#8b7355]" />}
+                {editingRecordId ? `Editar Lote #${formData.lote}` : 'Registrar Nuevo Lote'}
               </h2>
               <button 
-                onClick={() => setIsModalOpen(false)} 
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingRecordId(null);
+                }} 
                 className="text-[#8b7355] hover:text-[#2b2824] hover:bg-white/50 p-1.5 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -946,7 +1026,10 @@ const Produccion = () => {
             <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
               <button 
                 type="button" 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingRecordId(null);
+                }}
                 className="px-5 py-2.5 font-medium rounded-xl text-gray-600 hover:bg-gray-200 transition-colors"
               >
                 Cancelar
@@ -956,7 +1039,7 @@ const Produccion = () => {
                 form="produccion-form"
                 className="px-6 py-2.5 font-bold uppercase tracking-wide text-sm bg-[#8b7355] text-white rounded-xl hover:bg-[#735f46] transition-all shadow-sm hover:shadow-md"
               >
-                Guardar Registro
+                {editingRecordId ? 'Guardar Cambios' : 'Guardar Registro'}
               </button>
             </div>
           </div>

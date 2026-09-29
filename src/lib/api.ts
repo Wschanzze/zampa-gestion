@@ -439,6 +439,24 @@ export const useProduccion = () => {
     return false;
   };
 
+  const updateRecord = async (id: string, record: Partial<ProduccionRecord>) => {
+    const { data: updated, error } = await supabase
+      .from('zampa_produccion_quesos')
+      .update(record)
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Error actualizando produccion:', error);
+      alert('Error al actualizar: ' + error.message);
+      return false;
+    } else if (updated && updated[0]) {
+      setData(prev => prev.map(r => r.id === id ? updated[0] : r));
+      return true;
+    }
+    return false;
+  };
+
   const deleteRecord = async (id: string) => {
     const { error } = await supabase
       .from('zampa_produccion_quesos')
@@ -455,5 +473,5 @@ export const useProduccion = () => {
     }
   };
 
-  return { data, loading, addRecord, deleteRecord, refreshData: fetchData };
+  return { data, loading, addRecord, updateRecord, deleteRecord, refreshData: fetchData };
 };
