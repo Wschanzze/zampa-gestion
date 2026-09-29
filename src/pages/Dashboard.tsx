@@ -9,6 +9,8 @@ import {
   PieChart as PieIcon, 
   ArrowUpRight, 
   ArrowDownRight,
+  ArrowUp,
+  ArrowDown,
   Layers, 
   Calendar,
   CalendarRange,
@@ -45,35 +47,54 @@ const formatKg = (val: number) => {
   return `${val.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
 };
 
-// Date parser helper to sort chronologically (newest first)
+// Converts any date format ('DD/MM/YYYY', 'D/M/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY') into standardized 'YYYY-MM-DD'
+const parseDateToComparable = (fechaStr?: string): string => {
+  if (!fechaStr) return '';
+  const str = fechaStr.trim();
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      const d = parts[0].trim().padStart(2, '0');
+      const m = parts[1].trim().padStart(2, '0');
+      let y = parts[2].trim();
+      if (y.length === 2) y = '20' + y;
+      return `${y}-${m}-${d}`;
+    }
+  }
+  if (str.includes('-')) {
+    const parts = str.split('-');
+    if (parts.length === 3) {
+      if (parts[0].trim().length === 4) {
+        // YYYY-MM-DD
+        const y = parts[0].trim();
+        const m = parts[1].trim().padStart(2, '0');
+        const d = parts[2].trim().padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      } else {
+        // DD-MM-YYYY
+        const d = parts[0].trim().padStart(2, '0');
+        const m = parts[1].trim().padStart(2, '0');
+        let y = parts[2].trim();
+        if (y.length === 2) y = '20' + y;
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
+  return str;
+};
+
+// Date parser helper to sort chronologically (timestamp in ms at midday)
 const parseDateToTimestamp = (fechaStr?: string): number => {
   if (!fechaStr) return 0;
-  if (fechaStr.includes('/')) {
-    const parts = fechaStr.split('/');
-    if (parts.length === 3) {
-      const d = parseInt(parts[0], 10) || 1;
-      const m = (parseInt(parts[1], 10) || 1) - 1;
-      const y = parseInt(parts[2], 10) || 0;
-      return new Date(y, m, d).getTime();
+  const iso = parseDateToComparable(fechaStr);
+  if (iso && iso.length === 10 && iso[4] === '-' && iso[7] === '-') {
+    const [y, m, d] = iso.split('-').map(Number);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return new Date(y, m - 1, d, 12, 0, 0).getTime();
     }
   }
   const t = new Date(fechaStr).getTime();
   return isNaN(t) ? 0 : t;
-};
-
-// Converts 'DD/MM/YYYY' or 'YYYY-MM-DD' into standardized 'YYYY-MM-DD' for date comparisons
-const parseDateToComparable = (fechaStr?: string): string => {
-  if (!fechaStr) return '';
-  if (fechaStr.includes('/')) {
-    const parts = fechaStr.split('/');
-    if (parts.length === 3) {
-      const d = parts[0].padStart(2, '0');
-      const m = parts[1].padStart(2, '0');
-      const y = parts[2].trim();
-      return `${y}-${m}-${d}`;
-    }
-  }
-  return fechaStr.trim();
 };
 
 const getPresetRange = (preset: string) => {
@@ -129,6 +150,35 @@ const getSubactividadBadgeClass = (sub?: string) => {
   return 'bg-stone-100 text-stone-700 border-stone-200';
 };
 
+// Helper for extracting cheese details from a transaction
+interface CheeseDetail {
+  tipo: string;
+  kg: number;
+}
+
+const getCheeseDetails = (item: Transaction): { details: CheeseDetail[]; totalKg: number; isVentaQueso: boolean } => {
+  const rubro = (item.Rubro || '').toUpperCase();
+  const subrubro = (item['Subrubro/Producto'] || '').toUpperCase();
+
+  const cheeses = [
+    { tipo: 'Pecorino', val: Number(item.Pecorino) || 0 },
+    { tipo: 'Manchego', val: Number(item.Manchego) || 0 },
+    { tipo: 'Saborizado', val: Number(item.Saborizado) || 0 },
+    { tipo: 'Ahumado', val: Number(item.Ahumado) || 0 },
+    { tipo: 'Provoleta', val: Number(item.Provoleta) || 0 },
+    { tipo: 'Ricota', val: Number(item.Ricota) || 0 },
+  ];
+
+  const active = cheeses.filter(c => c.val > 0).map(c => ({ tipo: c.tipo, kg: c.val }));
+  const sum = active.reduce((acc, c) => acc + c.kg, 0);
+  const cant = Number(item.Cantidades) || 0;
+  const total = sum > 0 ? sum : cant;
+
+  const isVentaQueso = rubro.includes('QUESO') || subrubro.includes('QUESO') || sum > 0 || (cant > 0 && rubro.includes('VENTA'));
+
+  return { details: active, totalKg: total, isVentaQueso };
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   const navigate = useNavigate();
 
@@ -151,6 +201,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   const [egresosPage, setEgresosPage] = useState(1);
   const [egresosPerPage, setEgresosPerPage] = useState(10);
 
+  // Sorting order for movements list (default 'desc' for most recent first)
+  const [ingresosSortOrder, setIngresosSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [egresosSortOrder, setEgresosSortOrder] = useState<'desc' | 'asc'>('desc');
+
   const availableYears = useMemo(() => getAvailableYears(data), [data]);
   const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || 'TODOS');
 
@@ -158,7 +212,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   useEffect(() => {
     setIngresosPage(1);
     setEgresosPage(1);
-  }, [searchQuery, rubroFilter, fechaDesde, fechaHasta, selectedYear, viewMode]);
+  }, [searchQuery, rubroFilter, fechaDesde, fechaHasta, selectedYear, viewMode, ingresosSortOrder, egresosSortOrder]);
 
   // Handle Preset Clicks
   const handleApplyPreset = (presetKey: string) => {
@@ -177,8 +231,11 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   const filteredData = useMemo(() => {
     if (selectedYear === 'TODOS') return data;
     return data.filter(d => {
-      const parts = d.Fecha?.split('/');
-      return parts && parts.length === 3 && parts[2]?.trim() === selectedYear;
+      const comparable = parseDateToComparable(d.Fecha);
+      if (comparable && comparable.length >= 4) {
+        return comparable.substring(0, 4) === selectedYear;
+      }
+      return false;
     });
   }, [data, selectedYear]);
 
@@ -386,9 +443,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
     return Array.from(set).sort();
   }, [tabData]);
 
-  // Clean, Simplified Movements Feeds
+  // Clean, Simplified Movements Feeds (sorted strictly by date with order toggle)
   const filteredIngresosFeed = useMemo(() => {
-    return ingresosList.filter(item => {
+    const list = ingresosList.filter(item => {
       const q = searchQuery.toLowerCase().trim();
       const matchSearch = !q || 
         item['Prov/Cliente']?.toLowerCase().includes(q) ||
@@ -400,10 +457,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       const matchRubro = rubroFilter === 'TODOS' || item.Rubro?.trim() === rubroFilter;
       return matchSearch && matchRubro;
     });
-  }, [ingresosList, searchQuery, rubroFilter]);
+
+    return [...list].sort((a, b) => {
+      const timeA = parseDateToTimestamp(a.Fecha);
+      const timeB = parseDateToTimestamp(b.Fecha);
+      if (timeA !== timeB) {
+        return ingresosSortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+      }
+      return (b.id || '').localeCompare(a.id || '');
+    });
+  }, [ingresosList, searchQuery, rubroFilter, ingresosSortOrder]);
 
   const filteredEgresosFeed = useMemo(() => {
-    return egresosList.filter(item => {
+    const list = egresosList.filter(item => {
       const q = searchQuery.toLowerCase().trim();
       const matchSearch = !q || 
         item['Prov/Cliente']?.toLowerCase().includes(q) ||
@@ -415,7 +481,16 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       const matchRubro = rubroFilter === 'TODOS' || item.Rubro?.trim() === rubroFilter;
       return matchSearch && matchRubro;
     });
-  }, [egresosList, searchQuery, rubroFilter]);
+
+    return [...list].sort((a, b) => {
+      const timeA = parseDateToTimestamp(a.Fecha);
+      const timeB = parseDateToTimestamp(b.Fecha);
+      if (timeA !== timeB) {
+        return egresosSortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+      }
+      return (b.id || '').localeCompare(a.id || '');
+    });
+  }, [egresosList, searchQuery, rubroFilter, egresosSortOrder]);
 
   // Paginated Slices
   const totalIngresosPages = Math.max(1, Math.ceil(filteredIngresosFeed.length / ingresosPerPage));
@@ -431,10 +506,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   }, [filteredEgresosFeed, egresosPage, egresosPerPage]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       
       {/* Header with Title and Year Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/90 p-4 sm:p-5 rounded-xl border border-[#e0d6c8] shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/90 p-3.5 sm:p-5 rounded-xl border border-[#e0d6c8] shadow-sm">
         <div>
           <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center space-x-2">
             <Layers size={18} className="text-[#8b7355]" />
@@ -443,13 +518,15 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
           <p className="text-xs text-[#6b645c] mt-0.5">Indicadores financieros, balance por actividades y principales métricas de negocio</p>
         </div>
 
-        <div className="flex items-center space-x-2 self-start sm:self-auto">
-          <Calendar size={15} className="text-[#8b7355]" />
-          <label className="text-xs font-semibold text-[#6b645c] uppercase">Período Base:</label>
+        <div className="flex items-center space-x-2 self-stretch sm:self-auto justify-between sm:justify-end">
+          <div className="flex items-center space-x-1.5">
+            <Calendar size={15} className="text-[#8b7355]" />
+            <label className="text-xs font-semibold text-[#6b645c] uppercase">Período:</label>
+          </div>
           <select 
             value={selectedYear} 
             onChange={(e) => setSelectedYear(e.target.value)}
-            className="border border-[#e0d6c8] rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold text-[#2b2824] bg-[#faf9f6] focus:ring-1 focus:ring-[#8b7355] outline-none"
+            className="border border-[#e0d6c8] rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-bold text-[#2b2824] bg-[#faf9f6] focus:ring-1 focus:ring-[#8b7355] outline-none"
           >
             <option value="TODOS">Histórico Completo</option>
             {availableYears.map(yr => (
@@ -460,10 +537,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center space-x-2 border-b border-[#e0d6c8] bg-white/70 p-1.5 rounded-xl shadow-xs">
+      <div className="flex items-center space-x-2 border-b border-[#e0d6c8] bg-white/70 p-1.5 rounded-xl shadow-xs overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('resumen')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
+          className={`flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-initial ${
             activeTab === 'resumen'
               ? 'bg-[#8b7355] text-white shadow-xs'
               : 'text-[#6b645c] hover:text-[#2b2824] hover:bg-[#f4ebd8]/50'
@@ -475,7 +552,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
 
         <button
           onClick={() => setActiveTab('ingresos/egresos')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
+          className={`flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-initial ${
             activeTab === 'ingresos/egresos'
               ? 'bg-[#8b7355] text-white shadow-xs'
               : 'text-[#6b645c] hover:text-[#2b2824] hover:bg-[#f4ebd8]/50'
@@ -716,35 +793,35 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       {/* TAB 2: INGRESOS / EGRESOS (Clean & Simplified Summary View)              */}
       {/* ========================================================================= */}
       {activeTab === 'ingresos/egresos' && (
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* Date Range & Quick Presets Filter Box */}
-          <div className="bg-white/95 p-3.5 sm:p-4 rounded-xl border border-[#e0d6c8] shadow-sm space-y-3">
+          <div className="bg-white/95 p-3 sm:p-4 rounded-xl border border-[#e0d6c8] shadow-sm space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e0d6c8]/60 pb-2.5">
               <div className="flex items-center space-x-2 text-xs font-bold text-[#2b2824]">
                 <CalendarRange size={16} className="text-[#8b7355]" />
-                <span>Filtrar por Rango de Fecha</span>
+                <span>Rango de Fecha</span>
                 {(fechaDesde || fechaHasta) && (
                   <span className="text-[10px] bg-[#f4ebd8] text-[#8b7355] font-bold px-2 py-0.5 rounded-full border border-[#e0d6c8]">
-                    Filtrado Activo
+                    Activo
                   </span>
                 )}
               </div>
               
-              {/* Quick Presets Buttons */}
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="text-[11px] text-[#6b645c] font-semibold mr-1">Rápido:</span>
+              {/* Quick Presets Buttons (Scrollable or wrapped cleanly on mobile) */}
+              <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 text-xs">
+                <span className="text-[10px] sm:text-[11px] text-[#6b645c] font-semibold mr-0.5">Rápido:</span>
                 {[
-                  { id: 'todos', label: 'Todo el período' },
+                  { id: 'todos', label: 'Todo' },
                   { id: 'mes_actual', label: 'Este mes' },
-                  { id: 'ultimos_30', label: 'Últimos 30 días' },
-                  { id: 'mes_anterior', label: 'Mes anterior' },
-                  { id: 'anio_actual', label: 'Año en curso' }
+                  { id: 'ultimos_30', label: '30 días' },
+                  { id: 'mes_anterior', label: 'Mes ant.' },
+                  { id: 'anio_actual', label: 'Año actual' }
                 ].map(p => (
                   <button
                     key={p.id}
                     onClick={() => handleApplyPreset(p.id)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                    className={`px-2 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all ${
                       activePreset === p.id
                         ? 'bg-[#8b7355] text-white shadow-xs'
                         : 'bg-[#f4ebd8]/60 text-[#6b645c] hover:bg-[#f4ebd8] hover:text-[#2b2824]'
@@ -756,38 +833,40 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               </div>
             </div>
 
-            {/* Date Pickers (Desde / Hasta) */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center space-x-2">
-                <label className="text-xs font-semibold text-[#6b645c]">Desde:</label>
-                <input
-                  type="date"
-                  value={fechaDesde}
-                  onChange={(e) => {
-                    setFechaDesde(e.target.value);
-                    setActivePreset('custom');
-                  }}
-                  className="px-2.5 py-1.5 text-xs bg-[#faf9f6] border border-[#e0d6c8] rounded-lg text-[#2b2824] font-medium focus:ring-1 focus:ring-[#8b7355] outline-none"
-                />
-              </div>
+            {/* Date Pickers (Desde / Hasta) responsive grid */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2 flex-1">
+                <div className="flex items-center space-x-1.5 bg-[#faf9f6] border border-[#e0d6c8] rounded-lg px-2.5 py-1.5">
+                  <label className="text-[11px] font-semibold text-[#6b645c] shrink-0">Desde:</label>
+                  <input
+                    type="date"
+                    value={fechaDesde}
+                    onChange={(e) => {
+                      setFechaDesde(e.target.value);
+                      setActivePreset('custom');
+                    }}
+                    className="w-full text-xs bg-transparent text-[#2b2824] font-medium outline-none"
+                  />
+                </div>
 
-              <div className="flex items-center space-x-2">
-                <label className="text-xs font-semibold text-[#6b645c]">Hasta:</label>
-                <input
-                  type="date"
-                  value={fechaHasta}
-                  onChange={(e) => {
-                    setFechaHasta(e.target.value);
-                    setActivePreset('custom');
-                  }}
-                  className="px-2.5 py-1.5 text-xs bg-[#faf9f6] border border-[#e0d6c8] rounded-lg text-[#2b2824] font-medium focus:ring-1 focus:ring-[#8b7355] outline-none"
-                />
+                <div className="flex items-center space-x-1.5 bg-[#faf9f6] border border-[#e0d6c8] rounded-lg px-2.5 py-1.5">
+                  <label className="text-[11px] font-semibold text-[#6b645c] shrink-0">Hasta:</label>
+                  <input
+                    type="date"
+                    value={fechaHasta}
+                    onChange={(e) => {
+                      setFechaHasta(e.target.value);
+                      setActivePreset('custom');
+                    }}
+                    className="w-full text-xs bg-transparent text-[#2b2824] font-medium outline-none"
+                  />
+                </div>
               </div>
 
               {(fechaDesde || fechaHasta) && (
                 <button
                   onClick={() => handleApplyPreset('todos')}
-                  className="flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-50 border border-rose-200 rounded-lg transition-colors ml-auto sm:ml-2"
+                  className="flex items-center justify-center space-x-1 px-3 py-1.5 text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-50 border border-rose-200 rounded-lg transition-colors w-full sm:w-auto"
                   title="Restablecer fechas"
                 >
                   <RotateCcw size={12} />
@@ -801,62 +880,62 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             
             {/* Ingresos Card */}
-            <div className="bg-white/95 p-4 rounded-xl border border-emerald-200 shadow-sm relative overflow-hidden">
+            <div className="bg-white/95 p-3.5 sm:p-4 rounded-xl border border-emerald-200 shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Ingresos</span>
                 <span className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg">
                   <ArrowUpRight size={16} />
                 </span>
               </div>
-              <p className="text-2xl font-black text-emerald-700 mt-2 font-mono">
+              <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-2 font-mono">
                 {formatCurrency(tabTotalIngresos)}
               </p>
-              <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-emerald-50">
-                <span>{countIngresos} cobros en rango</span>
-                <span>Promedio: <strong className="text-emerald-800 font-mono">{formatCurrency(avgIngreso)}</strong></span>
+              <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-emerald-50">
+                <span>{countIngresos} cobros</span>
+                <span>Prom: <strong className="text-emerald-800 font-mono">{formatCurrency(avgIngreso)}</strong></span>
               </div>
             </div>
 
             {/* Egresos Card */}
-            <div className="bg-white/95 p-4 rounded-xl border border-rose-200 shadow-sm relative overflow-hidden">
+            <div className="bg-white/95 p-3.5 sm:p-4 rounded-xl border border-rose-200 shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Total Egresos</span>
                 <span className="p-1.5 bg-rose-50 text-rose-700 rounded-lg">
                   <ArrowDownRight size={16} />
                 </span>
               </div>
-              <p className="text-2xl font-black text-rose-700 mt-2 font-mono">
+              <p className="text-xl sm:text-2xl font-black text-rose-700 mt-2 font-mono">
                 {formatCurrency(tabTotalEgresos)}
               </p>
-              <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-rose-50">
-                <span>{countEgresos} pagos en rango</span>
-                <span>Promedio: <strong className="text-rose-800 font-mono">{formatCurrency(avgEgreso)}</strong></span>
+              <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-rose-50">
+                <span>{countEgresos} pagos</span>
+                <span>Prom: <strong className="text-rose-800 font-mono">{formatCurrency(avgEgreso)}</strong></span>
               </div>
             </div>
 
             {/* Balance Neto */}
-            <div className={`bg-white/95 p-4 rounded-xl border ${tabBalanceNeto >= 0 ? 'border-amber-300' : 'border-rose-300'} shadow-sm relative overflow-hidden`}>
+            <div className={`bg-white/95 p-3.5 sm:p-4 rounded-xl border ${tabBalanceNeto >= 0 ? 'border-amber-300' : 'border-rose-300'} shadow-sm relative overflow-hidden`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Balance Operativo</span>
                 <span className={`p-1.5 rounded-lg ${tabBalanceNeto >= 0 ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800'}`}>
                   <DollarSign size={16} />
                 </span>
               </div>
-              <p className={`text-2xl font-black mt-2 font-mono ${tabBalanceNeto >= 0 ? 'text-amber-950' : 'text-rose-700'}`}>
+              <p className={`text-xl sm:text-2xl font-black mt-2 font-mono ${tabBalanceNeto >= 0 ? 'text-amber-950' : 'text-rose-700'}`}>
                 {formatCurrency(tabBalanceNeto)}
               </p>
-              <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-[#f4ebd8]">
-                <span>Margen sobre ingresos</span>
-                <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${tabBalanceNeto >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                  {tabMargenOperativo}%
+              <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-[#6b645c] mt-2 pt-2 border-t border-[#f4ebd8]">
+                <span>Margen</span>
+                <span className={`font-bold px-1.5 py-0.2 rounded text-[10px] ${tabBalanceNeto >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  {tabMargenOperativo}% s/ ventas
                 </span>
               </div>
             </div>
 
           </div>
 
-          {/* Controls Bar: Search, Rubro Filter, and View Mode Toggle */}
-          <div className="bg-white/95 p-3.5 sm:p-4 rounded-xl border border-[#e0d6c8] shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Controls Bar: Search, Rubro Filter, and Mobile Segmented View Mode Toggle */}
+          <div className="bg-white/95 p-3 sm:p-4 rounded-xl border border-[#e0d6c8] shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-3">
             
             {/* Search Input & Rubro Dropdown */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
@@ -864,7 +943,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8b7355]" />
                 <input
                   type="text"
-                  placeholder="Buscar cliente, proveedor, rubro o detalle..."
+                  placeholder="Buscar cliente, proveedor, queso..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-[#faf9f6] border border-[#e0d6c8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8b7355] text-[#2b2824]"
@@ -874,7 +953,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               <select
                 value={rubroFilter}
                 onChange={(e) => setRubroFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs sm:text-sm bg-[#faf9f6] border border-[#e0d6c8] rounded-lg font-medium text-[#2b2824] focus:outline-none focus:ring-1 focus:ring-[#8b7355]"
+                className="w-full sm:w-auto px-3 py-1.5 text-xs sm:text-sm bg-[#faf9f6] border border-[#e0d6c8] rounded-lg font-medium text-[#2b2824] focus:outline-none focus:ring-1 focus:ring-[#8b7355]"
               >
                 <option value="TODOS">Todos los rubros ({availableRubros.length})</option>
                 {availableRubros.map(r => (
@@ -883,49 +962,50 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               </select>
             </div>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center space-x-1 bg-[#f4ebd8]/60 p-1 rounded-lg self-center sm:self-auto">
+            {/* View Mode Segmented Control (full width on mobile) */}
+            <div className="grid grid-cols-3 w-full md:w-auto bg-[#f4ebd8]/60 p-1 rounded-lg gap-1">
               <button
                 onClick={() => setViewMode('todos')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                className={`py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-md transition-all text-center truncate ${
                   viewMode === 'todos'
                     ? 'bg-white text-[#2b2824] shadow-xs'
                     : 'text-[#6b645c] hover:text-[#2b2824]'
                 }`}
               >
-                Ambos (Comparativo)
+                <span className="sm:hidden">Ambos</span>
+                <span className="hidden sm:inline">Ambos (Comparativo)</span>
               </button>
               <button
                 onClick={() => setViewMode('ingresos')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                className={`py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-md transition-all text-center truncate ${
                   viewMode === 'ingresos'
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'text-[#6b645c] hover:text-emerald-700'
                 }`}
               >
-                Solo Ingresos
+                Ingresos
               </button>
               <button
                 onClick={() => setViewMode('egresos')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                className={`py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-md transition-all text-center truncate ${
                   viewMode === 'egresos'
                     ? 'bg-rose-600 text-white shadow-xs'
                     : 'text-[#6b645c] hover:text-rose-700'
                 }`}
               >
-                Solo Egresos
+                Egresos
               </button>
             </div>
 
           </div>
 
           {/* Main Layout: Paired Rows ensuring identical heights between Ingresos and Egresos */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
             {/* Row 0: Column Section Titles */}
-            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6`}>
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-3 sm:gap-6`}>
               {(viewMode === 'todos' || viewMode === 'ingresos') && (
-                <div className="bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-xs flex items-center justify-between">
+                <div className="bg-emerald-700 text-white px-3.5 sm:px-4 py-2.5 rounded-xl shadow-xs flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <ArrowUpRight size={18} />
                     <h4 className="font-bold text-sm sm:text-base">Resumen de Ingresos</h4>
@@ -937,7 +1017,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               )}
 
               {(viewMode === 'todos' || viewMode === 'egresos') && (
-                <div className="bg-rose-700 text-white px-4 py-2.5 rounded-xl shadow-xs flex items-center justify-between">
+                <div className="bg-rose-700 text-white px-3.5 sm:px-4 py-2.5 rounded-xl shadow-xs flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <ArrowDownRight size={18} />
                     <h4 className="font-bold text-sm sm:text-base">Resumen de Egresos</h4>
@@ -950,9 +1030,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
             </div>
 
             {/* Row 1: Facturación por Rubro vs Costos por Rubro */}
-            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-4 sm:gap-6 items-stretch`}>
               {(viewMode === 'todos' || viewMode === 'ingresos') && (
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
                     <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
                       <Tag size={13} className="text-emerald-700" />
@@ -962,12 +1042,12 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                     {ingresosByRubro.length === 0 ? (
                       <p className="text-xs text-[#8c827a] italic py-2">No hay ingresos registrados para el período seleccionado.</p>
                     ) : (
-                      <div className="max-h-60 overflow-y-auto pr-1 space-y-2.5">
+                      <div className="max-h-56 sm:max-h-60 overflow-y-auto pr-1 space-y-2.5">
                         {ingresosByRubro.map((item) => (
                           <div key={item.name} className="space-y-1">
                             <div className="flex items-center justify-between text-xs">
                               <span className="font-bold text-[#2b2824] truncate pr-2">{item.name}</span>
-                              <div className="flex items-center space-x-2 whitespace-nowrap">
+                              <div className="flex items-center space-x-1.5 sm:space-x-2 whitespace-nowrap">
                                 <span className="text-[11px] text-[#6b645c] font-medium">{item.count} ops</span>
                                 <span className="font-mono font-bold text-emerald-800">{formatCurrency(item.total)}</span>
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded">
@@ -1001,12 +1081,12 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                     {egresosByRubro.length === 0 ? (
                       <p className="text-xs text-[#8c827a] italic py-2">No hay egresos registrados para el período seleccionado.</p>
                     ) : (
-                      <div className="max-h-60 overflow-y-auto pr-1 space-y-2.5">
+                      <div className="max-h-56 sm:max-h-60 overflow-y-auto pr-1 space-y-2.5">
                         {egresosByRubro.map((item) => (
                           <div key={item.name} className="space-y-1">
                             <div className="flex items-center justify-between text-xs">
                               <span className="font-bold text-[#2b2824] truncate pr-2">{item.name}</span>
-                              <div className="flex items-center space-x-2 whitespace-nowrap">
+                              <div className="flex items-center space-x-1.5 sm:space-x-2 whitespace-nowrap">
                                 <span className="text-[11px] text-[#6b645c] font-medium">{item.count} ops</span>
                                 <span className="font-mono font-bold text-rose-800">{formatCurrency(item.total)}</span>
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 bg-rose-50 text-rose-700 rounded">
@@ -1031,9 +1111,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
             </div>
 
             {/* Row 2: Principales Clientes vs Principales Proveedores */}
-            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-4 sm:gap-6 items-stretch`}>
               {(viewMode === 'todos' || viewMode === 'ingresos') && (
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
                     <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
                       <Users size={13} className="text-emerald-700" />
@@ -1065,7 +1145,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               )}
 
               {(viewMode === 'todos' || viewMode === 'egresos') && (
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
                     <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-3 flex items-center space-x-1.5">
                       <Building2 size={13} className="text-rose-700" />
@@ -1098,9 +1178,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
             </div>
 
             {/* Row 3: Cobros por Medio vs Egresos por Sector */}
-            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-4 sm:gap-6 items-stretch`}>
               {(viewMode === 'todos' || viewMode === 'ingresos') && (
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
                     <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
                       <CreditCard size={13} className="text-emerald-700" />
@@ -1108,7 +1188,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                     </h5>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {ingresosByCuenta.map(c => (
-                        <div key={c.name} className="p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
+                        <div key={c.name} className="p-2 sm:p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
                           <span className="text-[11px] font-bold text-[#2b2824] block truncate">{c.name}</span>
                           <p className="text-xs font-bold font-mono text-emerald-800 mt-1">{formatCurrency(c.total)}</p>
                           <span className="text-[10px] text-[#6b645c]">{c.count} reg. ({c.pct.toFixed(0)}%)</span>
@@ -1120,7 +1200,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               )}
 
               {(viewMode === 'todos' || viewMode === 'egresos') && (
-                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-4 shadow-sm h-full flex flex-col justify-between">
+                <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
                     <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
                       <Layers size={13} className="text-rose-700" />
@@ -1128,7 +1208,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                     </h5>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {egresosBySubactividad.map(s => (
-                        <div key={s.name} className="p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
+                        <div key={s.name} className="p-2 sm:p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block mb-1 truncate ${getSubactividadBadgeClass(s.name)}`}>
                             {s.name}
                           </span>
@@ -1143,18 +1223,35 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
             </div>
 
             {/* Row 4: Movimientos de Ingreso vs Movimientos de Egreso */}
-            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-6 items-stretch`}>
+            <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-4 sm:gap-6 items-stretch`}>
+              
+              {/* MOVIMIENTOS DE INGRESO */}
               {(viewMode === 'todos' || viewMode === 'ingresos') && (
                 <div className="bg-white/95 rounded-xl border border-[#e0d6c8] shadow-sm overflow-hidden h-full flex flex-col justify-between">
                   <div className="flex-1 flex flex-col">
-                    <div className="px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex items-center justify-between">
+                    <div className="px-3.5 sm:px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h5 className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Movimientos de Ingreso</h5>
-                        <p className="text-[11px] text-[#6b645c]">Registro simplificado de cobros</p>
+                        <p className="text-[10px] sm:text-[11px] text-[#6b645c]">Registro simplificado ordenado por fecha</p>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200">
-                        {filteredIngresosFeed.length} operaciones
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setIngresosSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                          className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border border-[#e0d6c8] bg-[#faf9f6] hover:bg-[#f4ebd8] text-[#2b2824] transition-colors"
+                          title="Cambiar orden por fecha"
+                        >
+                          <Calendar size={13} className="text-[#8b7355]" />
+                          <span className="text-[11px]">{ingresosSortOrder === 'desc' ? 'Más recientes' : 'Más antiguos'}</span>
+                          {ingresosSortOrder === 'desc' ? (
+                            <ArrowDown size={12} className="text-emerald-700" />
+                          ) : (
+                            <ArrowUp size={12} className="text-emerald-700" />
+                          )}
+                        </button>
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200">
+                          {filteredIngresosFeed.length} ops
+                        </span>
+                      </div>
                     </div>
 
                     {filteredIngresosFeed.length === 0 ? (
@@ -1163,70 +1260,111 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                       </div>
                     ) : (
                       <div className="divide-y divide-[#e0d6c8]/60 flex-1">
-                        {paginatedIngresos.map((item, idx) => (
-                          <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-[10px] font-mono font-bold text-[#8b7355] bg-[#f4ebd8] px-1.5 py-0.5 rounded">
-                                  {item.Fecha}
-                                </span>
-                                <span className="font-bold text-xs text-[#2b2824] truncate">
-                                  {item['Prov/Cliente'] || 'Cliente'}
-                                </span>
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getCuentaBadgeClass(item.Cuenta)}`}>
-                                  {item.Cuenta || 'N/A'}
-                                </span>
+                        {paginatedIngresos.map((item, idx) => {
+                          const cheeseInfo = getCheeseDetails(item);
+
+                          return (
+                            <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                                  <span className="text-[10px] font-mono font-bold text-[#8b7355] bg-[#f4ebd8] px-1.5 py-0.5 rounded">
+                                    {item.Fecha}
+                                  </span>
+                                  <span className="font-bold text-xs sm:text-sm text-[#2b2824] truncate">
+                                    {item['Prov/Cliente'] || 'Cliente'}
+                                  </span>
+                                  <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getCuentaBadgeClass(item.Cuenta)}`}>
+                                    {item.Cuenta || 'N/A'}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#6b645c] mt-0.5 truncate">
+                                  <span className="font-medium text-[#4a453e]">{item.Rubro || 'Sin Rubro'}</span>
+                                  {item['Subrubro/Producto'] && (
+                                    <>
+                                      <span className="text-[#c4b5a0]">•</span>
+                                      <span className="truncate">{item['Subrubro/Producto']}</span>
+                                    </>
+                                  )}
+                                  {item.Observaciones && (
+                                    <>
+                                      <span className="text-[#c4b5a0]">•</span>
+                                      <span className="italic text-[#8c827a] truncate max-w-[200px]">{item.Observaciones}</span>
+                                    </>
+                                  )}
+                                </div>
+
+                                {/* Desglose visual de Venta de Queso si corresponde */}
+                                {cheeseInfo.isVentaQueso && (
+                                  <div className="mt-2 pt-1.5 border-t border-[#e0d6c8]/60">
+                                    {cheeseInfo.details.length > 0 ? (
+                                      <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+                                        <span className="text-[10px] font-bold text-[#8b7355] uppercase tracking-wider flex items-center gap-1">
+                                          🧀 Quesos ({cheeseInfo.totalKg.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg):
+                                        </span>
+                                        {cheeseInfo.details.map(cd => (
+                                          <span 
+                                            key={cd.tipo} 
+                                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#f4ebd8] text-[#5c4a35] border border-[#e0d6c8]"
+                                          >
+                                            <span className="text-[#8b7355] mr-1">{cd.tipo}:</span>
+                                            <span>{cd.kg.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg</span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : cheeseInfo.totalKg > 0 ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-bold text-[#8b7355] uppercase tracking-wider">
+                                          🧀 Total vendido:
+                                        </span>
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#f4ebd8] text-[#5c4a35] border border-[#e0d6c8]">
+                                          {cheeseInfo.totalKg.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                                        </span>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                )}
                               </div>
 
-                              <div className="flex items-center space-x-2 text-[11px] text-[#6b645c] mt-0.5 truncate">
-                                <span className="font-medium text-[#4a453e]">{item.Rubro || 'Sin Rubro'}</span>
-                                {item['Subrubro/Producto'] && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="truncate">{item['Subrubro/Producto']}</span>
-                                  </>
-                                )}
-                                {item.Observaciones && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="italic text-[#8c827a] truncate max-w-[140px] sm:max-w-[200px]">{item.Observaciones}</span>
-                                  </>
-                                )}
+                              <div className="flex items-center justify-between sm:justify-end sm:text-right pt-1.5 sm:pt-0 border-t border-[#e0d6c8]/40 sm:border-0 whitespace-nowrap">
+                                <span className="text-[11px] text-[#6b645c] font-semibold sm:hidden">Cobrado:</span>
+                                <span className="font-mono font-black text-sm sm:text-base text-emerald-700">
+                                  +{formatCurrency(parseCurrency(item.Ingresos))}
+                                </span>
                               </div>
                             </div>
-
-                            <div className="text-right whitespace-nowrap">
-                              <span className="font-mono font-bold text-sm text-emerald-700">
-                                +{formatCurrency(parseCurrency(item.Ingresos))}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
 
-                  {/* Standard Pagination Controls for Ingresos */}
+                  {/* Standard Pagination Controls for Ingresos (Mobile Friendly) */}
                   {filteredIngresosFeed.length > 0 && (
-                    <div className="px-3 sm:px-4 py-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/70 flex flex-wrap items-center justify-between gap-2 text-xs text-[#6b645c]">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-[11px]">Ver:</span>
-                        <select
-                          value={ingresosPerPage}
-                          onChange={(e) => {
-                            setIngresosPerPage(Number(e.target.value));
-                            setIngresosPage(1);
-                          }}
-                          className="px-2 py-0.5 bg-white border border-[#e0d6c8] rounded text-xs font-bold text-[#2b2824] outline-none"
-                        >
-                          <option value={10}>10</option>
-                          <option value={25}>25</option>
-                          <option value={50}>50</option>
-                        </select>
-                        <span className="text-[11px]">por pág.</span>
+                    <div className="px-3 sm:px-4 py-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/70 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-[#6b645c]">
+                      <div className="flex items-center justify-between w-full sm:w-auto space-x-2">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-[11px]">Ver:</span>
+                          <select
+                            value={ingresosPerPage}
+                            onChange={(e) => {
+                              setIngresosPerPage(Number(e.target.value));
+                              setIngresosPage(1);
+                            }}
+                            className="px-2 py-0.5 bg-white border border-[#e0d6c8] rounded text-xs font-bold text-[#2b2824] outline-none"
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                          </select>
+                          <span className="text-[11px]">por pág.</span>
+                        </div>
+                        <span className="sm:hidden text-[11px] text-[#8b7355] font-bold">
+                          {filteredIngresosFeed.length} registros
+                        </span>
                       </div>
 
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center justify-between w-full sm:w-auto space-x-3">
                         <span className="text-[11px]">
                           Pág. <strong className="text-[#2b2824]">{ingresosPage}</strong> de <strong className="text-[#2b2824]">{totalIngresosPages}</strong>
                         </span>
@@ -1234,18 +1372,18 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                           <button
                             onClick={() => setIngresosPage(prev => Math.max(1, prev - 1))}
                             disabled={ingresosPage === 1}
-                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            className="p-1.5 rounded-lg border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
                             title="Página anterior"
                           >
-                            <ChevronLeft size={14} />
+                            <ChevronLeft size={15} />
                           </button>
                           <button
                             onClick={() => setIngresosPage(prev => Math.min(totalIngresosPages, prev + 1))}
                             disabled={ingresosPage === totalIngresosPages}
-                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            className="p-1.5 rounded-lg border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
                             title="Página siguiente"
                           >
-                            <ChevronRight size={14} />
+                            <ChevronRight size={15} />
                           </button>
                         </div>
                       </div>
@@ -1254,17 +1392,33 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                 </div>
               )}
 
+              {/* MOVIMIENTOS DE EGRESO */}
               {(viewMode === 'todos' || viewMode === 'egresos') && (
                 <div className="bg-white/95 rounded-xl border border-[#e0d6c8] shadow-sm overflow-hidden h-full flex flex-col justify-between">
                   <div className="flex-1 flex flex-col">
-                    <div className="px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex items-center justify-between">
+                    <div className="px-3.5 sm:px-4 py-3 border-b border-[#e0d6c8] bg-[#fdfdfc] flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h5 className="text-xs font-bold text-[#2b2824] uppercase tracking-wider">Movimientos de Egreso</h5>
-                        <p className="text-[11px] text-[#6b645c]">Registro simplificado de gastos</p>
+                        <p className="text-[10px] sm:text-[11px] text-[#6b645c]">Registro simplificado ordenado por fecha</p>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-50 text-rose-800 rounded border border-rose-200">
-                        {filteredEgresosFeed.length} gastos
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setEgresosSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                          className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border border-[#e0d6c8] bg-[#faf9f6] hover:bg-[#f4ebd8] text-[#2b2824] transition-colors"
+                          title="Cambiar orden por fecha"
+                        >
+                          <Calendar size={13} className="text-[#8b7355]" />
+                          <span className="text-[11px]">{egresosSortOrder === 'desc' ? 'Más recientes' : 'Más antiguos'}</span>
+                          {egresosSortOrder === 'desc' ? (
+                            <ArrowDown size={12} className="text-rose-700" />
+                          ) : (
+                            <ArrowUp size={12} className="text-rose-700" />
+                          )}
+                        </button>
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-50 text-rose-800 rounded border border-rose-200">
+                          {filteredEgresosFeed.length} gastos
+                        </span>
+                      </div>
                     </div>
 
                     {filteredEgresosFeed.length === 0 ? (
@@ -1274,13 +1428,13 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                     ) : (
                       <div className="divide-y divide-[#e0d6c8]/60 flex-1">
                         {paginatedEgresos.map((item, idx) => (
-                          <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex items-center justify-between gap-3">
+                          <div key={item.id || idx} className="p-3 hover:bg-[#faf9f6] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center space-x-2">
+                              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                                 <span className="text-[10px] font-mono font-bold text-[#8b7355] bg-[#f4ebd8] px-1.5 py-0.5 rounded">
                                   {item.Fecha}
                                 </span>
-                                <span className="font-bold text-xs text-[#2b2824] truncate">
+                                <span className="font-bold text-xs sm:text-sm text-[#2b2824] truncate">
                                   {item['Prov/Cliente'] || 'Proveedor'}
                                 </span>
                                 <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getSubactividadBadgeClass(item.Subactividad)}`}>
@@ -1288,25 +1442,26 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                                 </span>
                               </div>
 
-                              <div className="flex items-center space-x-2 text-[11px] text-[#6b645c] mt-0.5 truncate">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#6b645c] mt-0.5 truncate">
                                 <span className="font-medium text-[#4a453e]">{item.Rubro || 'Sin Rubro'}</span>
                                 {item['Subrubro/Producto'] && (
                                   <>
-                                    <span>•</span>
+                                    <span className="text-[#c4b5a0]">•</span>
                                     <span className="truncate">{item['Subrubro/Producto']}</span>
                                   </>
                                 )}
                                 {item.Observaciones && (
                                   <>
-                                    <span>•</span>
-                                    <span className="italic text-[#8c827a] truncate max-w-[140px] sm:max-w-[200px]">{item.Observaciones}</span>
+                                    <span className="text-[#c4b5a0]">•</span>
+                                    <span className="italic text-[#8c827a] truncate max-w-[200px]">{item.Observaciones}</span>
                                   </>
                                 )}
                               </div>
                             </div>
 
-                            <div className="text-right whitespace-nowrap">
-                              <span className="font-mono font-bold text-sm text-rose-700">
+                            <div className="flex items-center justify-between sm:justify-end sm:text-right pt-1.5 sm:pt-0 border-t border-[#e0d6c8]/40 sm:border-0 whitespace-nowrap">
+                              <span className="text-[11px] text-[#6b645c] font-semibold sm:hidden">Pagado:</span>
+                              <span className="font-mono font-black text-sm sm:text-base text-rose-700">
                                 -{formatCurrency(parseCurrency(item.Egresos))}
                               </span>
                             </div>
@@ -1316,27 +1471,32 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                     )}
                   </div>
 
-                  {/* Standard Pagination Controls for Egresos */}
+                  {/* Standard Pagination Controls for Egresos (Mobile Friendly) */}
                   {filteredEgresosFeed.length > 0 && (
-                    <div className="px-3 sm:px-4 py-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/70 flex flex-wrap items-center justify-between gap-2 text-xs text-[#6b645c]">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-[11px]">Ver:</span>
-                        <select
-                          value={egresosPerPage}
-                          onChange={(e) => {
-                            setEgresosPerPage(Number(e.target.value));
-                            setEgresosPage(1);
-                          }}
-                          className="px-2 py-0.5 bg-white border border-[#e0d6c8] rounded text-xs font-bold text-[#2b2824] outline-none"
-                        >
-                          <option value={10}>10</option>
-                          <option value={25}>25</option>
-                          <option value={50}>50</option>
-                        </select>
-                        <span className="text-[11px]">por pág.</span>
+                    <div className="px-3 sm:px-4 py-2.5 bg-[#faf9f6] border-t border-[#e0d6c8]/70 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-[#6b645c]">
+                      <div className="flex items-center justify-between w-full sm:w-auto space-x-2">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-[11px]">Ver:</span>
+                          <select
+                            value={egresosPerPage}
+                            onChange={(e) => {
+                              setEgresosPerPage(Number(e.target.value));
+                              setEgresosPage(1);
+                            }}
+                            className="px-2 py-0.5 bg-white border border-[#e0d6c8] rounded text-xs font-bold text-[#2b2824] outline-none"
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                          </select>
+                          <span className="text-[11px]">por pág.</span>
+                        </div>
+                        <span className="sm:hidden text-[11px] text-[#8b7355] font-bold">
+                          {filteredEgresosFeed.length} registros
+                        </span>
                       </div>
 
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center justify-between w-full sm:w-auto space-x-3">
                         <span className="text-[11px]">
                           Pág. <strong className="text-[#2b2824]">{egresosPage}</strong> de <strong className="text-[#2b2824]">{totalEgresosPages}</strong>
                         </span>
@@ -1344,18 +1504,18 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                           <button
                             onClick={() => setEgresosPage(prev => Math.max(1, prev - 1))}
                             disabled={egresosPage === 1}
-                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            className="p-1.5 rounded-lg border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
                             title="Página anterior"
                           >
-                            <ChevronLeft size={14} />
+                            <ChevronLeft size={15} />
                           </button>
                           <button
                             onClick={() => setEgresosPage(prev => Math.min(totalEgresosPages, prev + 1))}
                             disabled={egresosPage === totalEgresosPages}
-                            className="p-1 rounded border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
+                            className="p-1.5 rounded-lg border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50"
                             title="Página siguiente"
                           >
-                            <ChevronRight size={14} />
+                            <ChevronRight size={15} />
                           </button>
                         </div>
                       </div>

@@ -227,10 +227,14 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
 
         <button
           onClick={handleOpenGeneralPayment}
-          className="flex items-center space-x-1.5 px-4 py-2.5 bg-[#8b7355] text-white rounded-xl text-xs md:text-sm hover:bg-[#7a6448] font-bold shadow-sm transition-colors"
+          className="flex items-center space-x-2 px-4 py-2.5 text-white rounded-xl text-xs md:text-sm hover:brightness-110 active:scale-[0.98] font-bold shadow-sm transition-all border border-white/20"
+          style={{
+            background: 'linear-gradient(90deg, #15803d 0%, #16a34a 50%, #dc2626 50%, #b91c1c 100%)'
+          }}
         >
-          <PlusCircle size={16} />
-          <span>Registrar Cobro / Pago Parcial</span>
+          <ArrowDownLeft size={16} className="drop-shadow-sm" />
+          <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Registrar Cobro / Pago Parcial</span>
+          <ArrowUpRight size={16} className="drop-shadow-sm" />
         </button>
       </div>
 

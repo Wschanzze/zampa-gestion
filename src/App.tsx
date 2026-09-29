@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 // @ts-ignore
-import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo, Beaker, Plus } from 'lucide-react';
+import { LayoutDashboard, TableProperties, LineChart, WalletCards, PackageCheck, Menu, X, ListTodo, Beaker, Plus, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import CashFlow from './pages/CashFlow';
@@ -13,9 +13,11 @@ import Listas from './pages/Listas';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import TransactionForm from './components/TransactionForm';
+import PaymentModal from './components/PaymentModal';
 
-import { useSupabaseTransactions } from './lib/api';
+import { useSupabaseTransactions, useListas } from './lib/api';
 import { supabase } from './lib/supabase';
+import { calculatePendientes } from './utils/calculations';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -23,6 +25,7 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
+  const [isGlobalPaymentModalOpen, setIsGlobalPaymentModalOpen] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -36,6 +39,14 @@ function App() {
     deleteTransaction: handleDeleteTransaction,
     registerPayment 
   } = useSupabaseTransactions();
+
+  const { entidades } = useListas();
+
+  // Compute pending balances for available entities in payment modal
+  const availableEntities = useMemo(() => {
+    const pendientes = calculatePendientes(data, entidades.map(e => e.nombre));
+    return pendientes.map(p => ({ name: p.entity, saldo: p.saldo }));
+  }, [data, entidades]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -171,7 +182,7 @@ function App() {
 
         <nav className="flex-1 px-4 py-4 space-y-2 relative z-10 overflow-y-auto">
           {/* Quick Action Mobile */}
-          <div className="pb-3 mb-2 border-b border-[#e0d6c8]/40">
+          <div className="pb-3 mb-2 border-b border-[#e0d6c8]/40 space-y-2">
             <button 
               onClick={() => {
                 setIsMobileMenuOpen(false);
@@ -181,6 +192,23 @@ function App() {
             >
               <Plus size={20} />
               <span>Nuevo Movimiento</span>
+            </button>
+
+            <button 
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setIsGlobalPaymentModalOpen(true);
+              }}
+              className="w-full flex items-center justify-center space-x-2 text-white px-4 py-3 rounded-xl shadow-md transition-all hover:brightness-105 active:scale-[0.98] font-bold border border-white/20"
+              style={{
+                background: 'linear-gradient(90deg, #15803d 0%, #16a34a 50%, #dc2626 50%, #b91c1c 100%)'
+              }}
+            >
+              <ArrowDownLeft size={18} className="flex-shrink-0 drop-shadow-sm" />
+              <span className="text-sm font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
+                Registrar Cobro / Pago Parcial
+              </span>
+              <ArrowUpRight size={18} className="flex-shrink-0 drop-shadow-sm" />
             </button>
           </div>
 
@@ -277,6 +305,7 @@ function App() {
         isCollapsed={isSidebarCollapsed} 
         setIsCollapsed={setIsSidebarCollapsed} 
         onNewTransaction={() => setIsGlobalModalOpen(true)}
+        onRegisterPayment={() => setIsGlobalPaymentModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -366,6 +395,19 @@ function App() {
           existingData={data}
           onAdd={handleAddTransaction}
           onClose={() => setIsGlobalModalOpen(false)}
+        />
+      )}
+
+      {/* Global Payment Modal (Cobro / Pago Parcial) */}
+      {isGlobalPaymentModalOpen && (
+        <PaymentModal
+          isOpen={isGlobalPaymentModalOpen}
+          onClose={() => setIsGlobalPaymentModalOpen(false)}
+          onRegister={registerPayment}
+          initialEntity=""
+          initialType="COBRO_CLIENTE"
+          pendingBalance={0}
+          availableEntities={availableEntities}
         />
       )}
     </div>
