@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useProduccion } from '../lib/api';
 import * as XLSX from 'xlsx';
 import { 
@@ -17,6 +17,8 @@ import {
   PackageCheck,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -56,6 +58,8 @@ const Produccion = () => {
   const [sortField, setSortField] = useState<'fecha' | 'lote' | 'litros_leche' | 'kg_totales' | 'rendimiento'>('fecha');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [tableSearch, setTableSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
 
   const handleSort = (field: 'fecha' | 'lote' | 'litros_leche' | 'kg_totales' | 'rendimiento') => {
     if (sortField === field) {
@@ -277,6 +281,23 @@ const Produccion = () => {
       return 0;
     });
   }, [filteredData, tableSearch, sortField, sortDirection]);
+
+  // Reset pagination to page 1 whenever filters, search, or sorting change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate, selectedVariedad, tableSearch, sortField, sortDirection]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / itemsPerPage));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedData = useMemo(() => {
+    const startIdx = (safeCurrentPage - 1) * itemsPerPage;
+    return sortedData.slice(startIdx, startIdx + itemsPerPage);
+  }, [sortedData, safeCurrentPage, itemsPerPage]);
+
+  const startIndex = sortedData.length === 0 ? 0 : (safeCurrentPage - 1) * itemsPerPage + 1;
+  const endIndex = Math.min(safeCurrentPage * itemsPerPage, sortedData.length);
 
   // Derived metrics
   const totalLitros = filteredData.reduce((acc, curr) => acc + Number(curr.litros_leche || 0), 0);
@@ -1172,7 +1193,7 @@ const Produccion = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0d6c8]/60">
-              {sortedData.map((row) => {
+              {paginatedData.map((row) => {
                 const litros = Number(row.litros_leche) || 0;
                 const kg = Number(row.kg_totales) || 0;
                 const yieldVal = row.rendimiento ? Number(row.rendimiento) : (litros > 0 ? (kg / litros) * 100 : 0);
@@ -1282,6 +1303,103 @@ const Produccion = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {sortedData.length > 0 && (
+          <div className="px-4 sm:px-6 py-3.5 bg-[#faf9f6] border-t border-[#e0d6c8] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6b645c]">
+            {/* Left: Items per page & count info */}
+            <div className="flex items-center justify-between w-full sm:w-auto space-x-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-[11px] font-medium">Mostrar:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 bg-white border border-[#e0d6c8] rounded-lg text-xs font-bold text-[#2b2824] outline-none focus:ring-1 focus:ring-[#8b7355] cursor-pointer shadow-2xs"
+                >
+                  <option value={15}>15 por pág.</option>
+                  <option value={30}>30 por pág.</option>
+                  <option value={50}>50 por pág.</option>
+                </select>
+              </div>
+
+              <span className="text-xs text-[#6b645c]">
+                Mostrando <strong className="text-[#2b2824]">{startIndex}</strong> - <strong className="text-[#2b2824]">{endIndex}</strong> de <strong className="text-[#2b2824]">{sortedData.length}</strong> lotes
+              </span>
+            </div>
+
+            {/* Right: Page navigation */}
+            <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-2">
+              <span className="text-xs text-[#6b645c]">
+                Página <strong className="text-[#2b2824]">{safeCurrentPage}</strong> de <strong className="text-[#2b2824]">{totalPages}</strong>
+              </span>
+
+              <div className="flex items-center space-x-1">
+                {/* Previous Page */}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={safeCurrentPage === 1}
+                  className="p-1.5 rounded-lg border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50 transition-colors shadow-2xs"
+                  title="Página anterior"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {/* Page numbers (up to 5 page buttons or ellipsis) */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => {
+                    if (p === 1 || p === totalPages) return true;
+                    if (Math.abs(p - safeCurrentPage) <= 1) return true;
+                    return false;
+                  })
+                  .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+                      acc.push(`dots-${p}`);
+                    }
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item) => {
+                    if (typeof item === 'string') {
+                      return (
+                        <span key={item} className="px-1 text-gray-400 select-none">
+                          ...
+                        </span>
+                      );
+                    }
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setCurrentPage(item)}
+                        className={`min-w-7 h-7 px-2 text-xs font-bold rounded-lg transition-colors ${
+                          safeCurrentPage === item
+                            ? 'bg-[#8b7355] text-white shadow-2xs'
+                            : 'bg-white border border-[#e0d6c8] text-[#2b2824] hover:bg-[#f4ebd8]/50'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    );
+                  })}
+
+                {/* Next Page */}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-[#e0d6c8] bg-white text-[#2b2824] disabled:opacity-35 disabled:cursor-not-allowed hover:bg-[#f4ebd8]/50 transition-colors shadow-2xs"
+                  title="Página siguiente"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal / Dialog */}
