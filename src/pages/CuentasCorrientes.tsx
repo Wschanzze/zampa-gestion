@@ -17,6 +17,7 @@ interface CuentasCorrientesProps {
     date: string;
     subactividad?: string;
     notes?: string;
+    selectedCargoIds?: string[];
   }) => Promise<boolean | void>;
 }
 

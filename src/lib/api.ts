@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import type { Transaction } from '../utils/calculations';
+import { parseCurrency, parseFechaToTime } from '../utils/calculations';
 
 // Map Supabase snake_case columns to our React component's expected fields
 export const mapFromSupabase = (row: any): Transaction => ({
@@ -172,6 +173,7 @@ export const useSupabaseTransactions = () => {
     date: string;
     subactividad?: string;
     notes?: string;
+    selectedCargoIds?: string[];
   }) => {
     let pgDate = payment.date;
     if (payment.date.includes('/')) {
@@ -182,7 +184,170 @@ export const useSupabaseTransactions = () => {
     const isCobro = payment.type === 'COBRO_CLIENTE';
     const subactividad = payment.subactividad || 'QUESERIA';
 
-    // 1. Real movement in chosen financial account (BANCO, EFECTIVO)
+    // If specific pending cargos were chosen (or "Saldar todo"):
+    if (payment.selectedCargoIds && payment.selectedCargoIds.length > 0) {
+      const selectedTxs = data
+        .filter(t => t.id && payment.selectedCargoIds!.includes(t.id))
+        .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
+
+      if (selectedTxs.length > 0) {
+        let remainingPayment = payment.amount;
+        const updatedTxs: Transaction[] = [];
+        const newResidualTxs: Transaction[] = [];
+
+        for (const tx of selectedTxs) {
+          if (remainingPayment <= 0.001) break;
+
+          const txAmount = isCobro ? parseCurrency(tx.Ingresos) : parseCurrency(tx.Egresos);
+          if (txAmount <= 0) continue;
+
+          if (remainingPayment >= txAmount - 0.01) {
+            // 1. FULL SETTLEMENT of this cargo: transitions from 'PENDIENTE' to payment.account
+            const noteDetail = payment.notes?.trim() ? ` [${payment.notes.trim()}]` : '';
+            const obs = tx.Observaciones?.trim()
+              ? `${tx.Observaciones.trim()} (Saldado vía ${payment.account} el ${payment.date}${noteDetail})`
+              : `Saldado vía ${payment.account} el ${payment.date}${noteDetail}`;
+
+            const { error: updErr } = await supabase
+              .from('zampa_transacciones')
+              .update({
+                cuenta: payment.account,
+                observaciones: obs
+              })
+              .eq('id', tx.id);
+
+            if (updErr) {
+              console.error('Error actualizando cargo a ' + payment.account, updErr);
+            } else {
+              const updatedItem: Transaction = {
+                ...tx,
+                Cuenta: payment.account,
+                Observaciones: obs
+              };
+              updatedTxs.push(updatedItem);
+              syncListsWithSupabase(updatedItem);
+            }
+            remainingPayment = Math.max(0, remainingPayment - txAmount);
+          } else {
+            // 2. PARTIAL SETTLEMENT: paid portion transitions to payment.account, remainder stays in PENDIENTE
+            const paidPortion = parseFloat(remainingPayment.toFixed(2));
+            const residualPortion = parseFloat((txAmount - paidPortion).toFixed(2));
+
+            const noteDetail = payment.notes?.trim() ? ` [${payment.notes.trim()}]` : '';
+            const obsPaid = tx.Observaciones?.trim()
+              ? `${tx.Observaciones.trim()} (Pago parcial de $${paidPortion.toLocaleString('es-AR')} vía ${payment.account} el ${payment.date}${noteDetail})`
+              : `Pago parcial de $${paidPortion.toLocaleString('es-AR')} vía ${payment.account} el ${payment.date}${noteDetail}`;
+
+            // Update original tx row with paid amount and new account
+            const { error: updErr } = await supabase
+              .from('zampa_transacciones')
+              .update({
+                cuenta: payment.account,
+                ingresos: isCobro ? paidPortion : 0,
+                egresos: isCobro ? 0 : paidPortion,
+                observaciones: obsPaid
+              })
+              .eq('id', tx.id);
+
+            if (updErr) {
+              console.error('Error actualizando pago parcial:', updErr);
+            } else {
+              const updatedItem: Transaction = {
+                ...tx,
+                Cuenta: payment.account,
+                Ingresos: isCobro ? paidPortion : 0,
+                Egresos: isCobro ? 0 : paidPortion,
+                Observaciones: obsPaid
+              };
+              updatedTxs.push(updatedItem);
+              syncListsWithSupabase(updatedItem);
+            }
+
+            // Insert residual pending row keeping original invoice date
+            const origPgDate = mapToSupabase(tx).fecha;
+            const residualPayload = {
+              fecha: origPgDate,
+              prov_cliente: tx['Prov/Cliente'],
+              cuenta: 'PENDIENTE',
+              ingresos: isCobro ? residualPortion : 0,
+              egresos: isCobro ? 0 : residualPortion,
+              rubro: tx.Rubro,
+              subactividad: tx.Subactividad || subactividad,
+              subrubro_producto: tx['Subrubro/Producto'] || null,
+              pecorino: 0,
+              manchego: 0,
+              saborizado: 0,
+              ahumado: 0,
+              provoleta: 0,
+              ricota: 0,
+              cantidades: 0,
+              observaciones: `Saldo pendiente restante ($${residualPortion.toLocaleString('es-AR')} de $${txAmount.toLocaleString('es-AR')}) - Ref original del ${tx.Fecha}`
+            };
+
+            const { data: insertedResidual, error: insErr } = await supabase
+              .from('zampa_transacciones')
+              .insert([residualPayload])
+              .select();
+
+            if (insErr) {
+              console.error('Error insertando saldo residual:', insErr);
+            } else if (insertedResidual) {
+              const mappedResidual = insertedResidual.map(mapFromSupabase);
+              newResidualTxs.push(...mappedResidual);
+              mappedResidual.forEach(t => syncListsWithSupabase(t));
+            }
+
+            remainingPayment = 0;
+          }
+        }
+
+        // If leftover remainingPayment > 0.01 (surplus payment beyond selected cargos):
+        if (remainingPayment > 0.01) {
+          const excessPortion = parseFloat(remainingPayment.toFixed(2));
+          const excessPayload = {
+            fecha: pgDate,
+            prov_cliente: payment.entity,
+            cuenta: payment.account,
+            ingresos: isCobro ? excessPortion : 0,
+            egresos: isCobro ? 0 : excessPortion,
+            rubro: isCobro ? 'COBRO CUENTA CORRIENTE' : 'PAGO PROVEEDOR',
+            subactividad: subactividad,
+            subrubro_producto: null,
+            pecorino: 0,
+            manchego: 0,
+            saborizado: 0,
+            ahumado: 0,
+            provoleta: 0,
+            ricota: 0,
+            cantidades: 0,
+            observaciones: payment.notes || (isCobro ? `Cobro excedente a cuenta vía ${payment.account}` : `Pago excedente a cuenta vía ${payment.account}`)
+          };
+
+          const { data: insertedExcess, error: excessErr } = await supabase
+            .from('zampa_transacciones')
+            .insert([excessPayload])
+            .select();
+
+          if (!excessErr && insertedExcess) {
+            const mappedExcess = insertedExcess.map(mapFromSupabase);
+            newResidualTxs.push(...mappedExcess);
+            mappedExcess.forEach(t => syncListsWithSupabase(t));
+          }
+        }
+
+        // Update local state in React
+        setData(prev => {
+          const updatedMap = new Map(updatedTxs.map(t => [t.id, t]));
+          const nextList = prev.map(t => (t.id && updatedMap.has(t.id) ? updatedMap.get(t.id)! : t));
+          return [...nextList, ...newResidualTxs];
+        });
+
+        fetchData();
+        return true;
+      }
+    }
+
+    // 3. Fallback: unlinked / advance payment without specific cargo selected
     const realMovement = {
       fecha: pgDate,
       prov_cliente: payment.entity,
@@ -217,7 +382,7 @@ export const useSupabaseTransactions = () => {
       
       // Sync lists dynamically
       mapped.forEach(tx => syncListsWithSupabase(tx));
-      
+      fetchData();
       return true;
     }
     return false;

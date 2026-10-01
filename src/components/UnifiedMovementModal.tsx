@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Transaction } from '../utils/calculations';
-import { normalizeDecimal, parseDecimalNumber } from '../utils/calculations';
+import { normalizeDecimal, parseDecimalNumber, parseCurrency, parseFechaToTime } from '../utils/calculations';
 import { useListas } from '../lib/api';
 import ComboboxSelect from './ComboboxSelect';
 // @ts-ignore
-import { X, Sparkles, Calculator, ArrowDownLeft, ArrowUpRight, DollarSign, WalletCards, Receipt, Calendar } from 'lucide-react';
+import { X, Sparkles, Calculator, ArrowDownLeft, ArrowUpRight, DollarSign, WalletCards, Receipt, Calendar, CheckCircle2 } from 'lucide-react';
 
 interface UnifiedMovementModalProps {
   isOpen: boolean;
@@ -24,6 +24,7 @@ interface UnifiedMovementModalProps {
     date: string;
     subactividad?: string;
     notes?: string;
+    selectedCargoIds?: string[];
   }) => Promise<boolean | void>;
   initialEntity?: string;
   initialPaymentType?: 'COBRO_CLIENTE' | 'PAGO_PROVEEDOR';
@@ -170,13 +171,65 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
   const [paymentDate, setPaymentDate] = useState(getTodayDisplayDate());
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [selectedCargoIds, setSelectedCargoIds] = useState<string[]>([]);
+
+  // Pending cargos for the selected entity & payment type
+  const pendingCargos = useMemo(() => {
+    if (!paymentEntity.trim()) return [];
+    const normalized = paymentEntity.trim().toLowerCase();
+    const isCobro = paymentType === 'COBRO_CLIENTE';
+
+    return existingData
+      .filter(tx => {
+        if (!tx['Prov/Cliente'] || tx['Prov/Cliente'].trim().toLowerCase() !== normalized) return false;
+        const c = (tx.Cuenta || '').trim().toUpperCase();
+        if (c !== 'PENDIENTE') return false;
+
+        const ing = parseCurrency(tx.Ingresos);
+        const eg = parseCurrency(tx.Egresos);
+        return isCobro ? ing > 0 : eg > 0;
+      })
+      .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha)); // Oldest first
+  }, [existingData, paymentEntity, paymentType]);
 
   // Synchronize on modal open or prop changes
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialMode);
-      if (initialEntity) setPaymentEntity(initialEntity);
-      if (initialPaymentType) setPaymentType(initialPaymentType);
+      const entityToUse = initialEntity || '';
+      const typeToUse = initialPaymentType || 'COBRO_CLIENTE';
+      setPaymentEntity(entityToUse);
+      setPaymentType(typeToUse);
+
+      if (entityToUse) {
+        const normalized = entityToUse.trim().toLowerCase();
+        const isCobro = typeToUse === 'COBRO_CLIENTE';
+        const matches = existingData
+          .filter(tx => {
+            if (!tx['Prov/Cliente'] || tx['Prov/Cliente'].trim().toLowerCase() !== normalized) return false;
+            if ((tx.Cuenta || '').trim().toUpperCase() !== 'PENDIENTE') return false;
+            const ing = parseCurrency(tx.Ingresos);
+            const eg = parseCurrency(tx.Egresos);
+            return isCobro ? ing > 0 : eg > 0;
+          })
+          .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
+
+        const ids = matches.map(c => c.id).filter(Boolean) as string[];
+        setSelectedCargoIds(ids);
+
+        const sum = matches.reduce((acc, c) => acc + (isCobro ? parseCurrency(c.Ingresos) : parseCurrency(c.Egresos)), 0);
+        if (sum > 0) {
+          setPaymentAmount(String(sum));
+        } else if (Math.abs(pendingBalance) > 0) {
+          setPaymentAmount(String(Math.abs(pendingBalance)));
+        } else {
+          setPaymentAmount('');
+        }
+      } else {
+        setSelectedCargoIds([]);
+        setPaymentAmount('');
+      }
+
       if (!initialTransactionData) {
         setFormData({
           Fecha: getTodayDisplayDate(),
@@ -194,11 +247,10 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
         });
         setTipoMovimiento('INGRESO');
         setPaymentDate(getTodayDisplayDate());
-        setPaymentAmount('');
         setPaymentNotes('');
       }
     }
-  }, [isOpen, initialMode, initialEntity, initialPaymentType, initialTransactionData]);
+  }, [isOpen, initialMode, initialEntity, initialPaymentType, initialTransactionData, pendingBalance, existingData]);
 
   // Load initialTransactionData when in Edit mode
   useEffect(() => {
@@ -229,11 +281,125 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
     return match ? match.saldo : pendingBalance;
   }, [paymentEntity, availableEntities, pendingBalance]);
 
+  const handleEntityChange = (val: string) => {
+    setPaymentEntity(val);
+    const normalized = val.trim().toLowerCase();
+    const isCobro = paymentType === 'COBRO_CLIENTE';
+    const matches = existingData
+      .filter(tx => {
+        if (!tx['Prov/Cliente'] || tx['Prov/Cliente'].trim().toLowerCase() !== normalized) return false;
+        if ((tx.Cuenta || '').trim().toUpperCase() !== 'PENDIENTE') return false;
+        const ing = parseCurrency(tx.Ingresos);
+        const eg = parseCurrency(tx.Egresos);
+        return isCobro ? ing > 0 : eg > 0;
+      })
+      .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
+
+    const ids = matches.map(c => c.id).filter(Boolean) as string[];
+    setSelectedCargoIds(ids);
+
+    const sum = matches.reduce((acc, c) => acc + (isCobro ? parseCurrency(c.Ingresos) : parseCurrency(c.Egresos)), 0);
+    if (sum > 0) {
+      setPaymentAmount(String(sum));
+    } else {
+      const match = availableEntities.find(e => e.name.toLowerCase().trim() === normalized);
+      if (match && Math.abs(match.saldo) > 0) {
+        setPaymentAmount(String(Math.abs(match.saldo)));
+      } else {
+        setPaymentAmount('');
+      }
+    }
+  };
+
+  const handlePaymentTypeChange = (newType: 'COBRO_CLIENTE' | 'PAGO_PROVEEDOR') => {
+    setPaymentType(newType);
+    if (!paymentEntity) return;
+    const normalized = paymentEntity.trim().toLowerCase();
+    const isCobro = newType === 'COBRO_CLIENTE';
+    const matches = existingData
+      .filter(tx => {
+        if (!tx['Prov/Cliente'] || tx['Prov/Cliente'].trim().toLowerCase() !== normalized) return false;
+        if ((tx.Cuenta || '').trim().toUpperCase() !== 'PENDIENTE') return false;
+        const ing = parseCurrency(tx.Ingresos);
+        const eg = parseCurrency(tx.Egresos);
+        return isCobro ? ing > 0 : eg > 0;
+      })
+      .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
+
+    const ids = matches.map(c => c.id).filter(Boolean) as string[];
+    setSelectedCargoIds(ids);
+
+    const sum = matches.reduce((acc, c) => acc + (isCobro ? parseCurrency(c.Ingresos) : parseCurrency(c.Egresos)), 0);
+    setPaymentAmount(sum > 0 ? String(sum) : '');
+  };
+
   const handleFillTotal = () => {
-    if (Math.abs(currentPending) > 0) {
+    const isCobro = paymentType === 'COBRO_CLIENTE';
+    if (pendingCargos.length > 0) {
+      const allIds = pendingCargos.map(c => c.id).filter(Boolean) as string[];
+      setSelectedCargoIds(allIds);
+      const sum = pendingCargos.reduce((acc, c) => acc + (isCobro ? parseCurrency(c.Ingresos) : parseCurrency(c.Egresos)), 0);
+      setPaymentAmount(String(sum));
+    } else if (Math.abs(currentPending) > 0) {
       setPaymentAmount(String(Math.abs(currentPending)));
     }
   };
+
+  const handleToggleCargo = (cargoId: string) => {
+    const isCobro = paymentType === 'COBRO_CLIENTE';
+    const nextSelected = selectedCargoIds.includes(cargoId)
+      ? selectedCargoIds.filter(id => id !== cargoId)
+      : [...selectedCargoIds, cargoId];
+
+    setSelectedCargoIds(nextSelected);
+
+    const sum = pendingCargos
+      .filter(c => c.id && nextSelected.includes(c.id))
+      .reduce((acc, c) => acc + (isCobro ? parseCurrency(c.Ingresos) : parseCurrency(c.Egresos)), 0);
+
+    setPaymentAmount(sum > 0 ? String(sum) : '');
+  };
+
+  const handleSelectAllCargos = () => {
+    const isCobro = paymentType === 'COBRO_CLIENTE';
+    const allIds = pendingCargos.map(c => c.id).filter(Boolean) as string[];
+    setSelectedCargoIds(allIds);
+    const sum = pendingCargos.reduce((acc, c) => acc + (isCobro ? parseCurrency(c.Ingresos) : parseCurrency(c.Egresos)), 0);
+    setPaymentAmount(sum > 0 ? String(sum) : '');
+  };
+
+  const handleDeselectAllCargos = () => {
+    setSelectedCargoIds([]);
+    setPaymentAmount('');
+  };
+
+  // Map each selected cargo to its live coverage status (FULL, PARTIAL, UNPAID)
+  const cargoStatusMap = useMemo(() => {
+    const map: Record<string, { status: 'FULL' | 'PARTIAL' | 'UNPAID'; paidAmount: number; pendingRemainder: number }> = {};
+    let remaining = parseDecimalNumber(paymentAmount);
+    const isCobro = paymentType === 'COBRO_CLIENTE';
+
+    const selectedList = pendingCargos.filter(c => c.id && selectedCargoIds.includes(c.id));
+
+    selectedList.forEach(c => {
+      const id = c.id!;
+      const total = isCobro ? parseCurrency(c.Ingresos) : parseCurrency(c.Egresos);
+
+      if (remaining <= 0.001) {
+        map[id] = { status: 'UNPAID', paidAmount: 0, pendingRemainder: total };
+      } else if (remaining >= total - 0.01) {
+        map[id] = { status: 'FULL', paidAmount: total, pendingRemainder: 0 };
+        remaining -= total;
+      } else {
+        const paid = remaining;
+        const rest = parseFloat((total - remaining).toFixed(2));
+        map[id] = { status: 'PARTIAL', paidAmount: paid, pendingRemainder: rest };
+        remaining = 0;
+      }
+    });
+
+    return map;
+  }, [pendingCargos, selectedCargoIds, paymentAmount, paymentType]);
 
   // Helper display for inputs
   const displayValue = (val: any) => {
@@ -360,7 +526,8 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
       type: paymentType,
       account: paymentAccount,
       date: paymentDate,
-      notes: paymentNotes.trim()
+      notes: paymentNotes.trim(),
+      selectedCargoIds: selectedCargoIds
     });
     setPaymentSubmitting(false);
 
@@ -688,7 +855,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                 <div className="flex p-1 bg-[#eae0cd]/60 rounded-xl border border-[#e0d6c8]">
                   <button
                     type="button"
-                    onClick={() => setPaymentType('COBRO_CLIENTE')}
+                    onClick={() => handlePaymentTypeChange('COBRO_CLIENTE')}
                     className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
                       paymentType === 'COBRO_CLIENTE'
                         ? 'bg-emerald-600 text-white shadow-sm'
@@ -700,7 +867,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentType('PAGO_PROVEEDOR')}
+                    onClick={() => handlePaymentTypeChange('PAGO_PROVEEDOR')}
                     className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
                       paymentType === 'PAGO_PROVEEDOR'
                         ? 'bg-rose-600 text-white shadow-sm'
@@ -719,7 +886,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                   required
                   placeholder="Selecciona o escribe cliente/proveedor..."
                   value={paymentEntity}
-                  onChange={(val) => setPaymentEntity(val)}
+                  onChange={handleEntityChange}
                   options={availableEntities.length > 0 ? availableEntities.map(e => e.name) : autocompleteLists.proveedores}
                 />
 
@@ -745,6 +912,132 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                       >
                         Saldar Todo
                       </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Lista de Cargos / Facturas Pendientes a Imputar */}
+                {paymentEntity && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs font-bold text-[#3e3a35] flex items-center gap-1.5">
+                          <Receipt size={14} className="text-[#8b7355]" />
+                          <span>Cargos Pendientes en Base de Datos ({pendingCargos.length})</span>
+                        </label>
+                        <p className="text-[11px] text-[#6b645c]">
+                          Selecciona a qué cargo(s) asignar este pago. Al saldarse, pasarán de <strong className="text-amber-800">Pendiente</strong> a <strong className="text-blue-800">{paymentAccount}</strong>.
+                        </p>
+                      </div>
+                      {pendingCargos.length > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <button
+                            type="button"
+                            onClick={handleSelectAllCargos}
+                            className="text-[11px] font-semibold text-[#8b7355] hover:text-[#735f46] hover:underline"
+                          >
+                            Todas
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            type="button"
+                            onClick={handleDeselectAllCargos}
+                            className="text-[11px] font-semibold text-[#6b645c] hover:text-[#3e3a35] hover:underline"
+                          >
+                            Ninguna
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {pendingCargos.length > 0 ? (
+                      <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1 rounded-xl border border-[#e0d6c8] bg-white p-2">
+                        {pendingCargos.map((cargo) => {
+                          const isSelected = !!cargo.id && selectedCargoIds.includes(cargo.id);
+                          const cargoAmount = paymentType === 'COBRO_CLIENTE' ? parseCurrency(cargo.Ingresos) : parseCurrency(cargo.Egresos);
+                          const statusInfo = cargo.id ? cargoStatusMap[cargo.id] : undefined;
+
+                          return (
+                            <div
+                              key={cargo.id}
+                              onClick={() => cargo.id && handleToggleCargo(cargo.id)}
+                              className={`p-2.5 rounded-lg border transition-all cursor-pointer flex flex-col gap-1.5 ${
+                                isSelected
+                                  ? 'bg-[#f4ebd8]/40 border-[#8b7355] shadow-2xs'
+                                  : 'bg-white border-[#e0d6c8]/60 hover:border-[#8b7355]/50 hover:bg-[#faf7f2]'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center space-x-2.5 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => cargo.id && handleToggleCargo(cargo.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-4 h-4 rounded text-[#8b7355] border-[#e0d6c8] focus:ring-[#8b7355] cursor-pointer"
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="flex items-center space-x-2 flex-wrap">
+                                      <span className="text-xs font-bold text-[#3e3a35]">{cargo.Fecha}</span>
+                                      <span className="text-xs font-semibold text-[#6b645c] truncate">
+                                        {cargo.Rubro || 'Sin rubro'}
+                                      </span>
+                                      {cargo['Subrubro/Producto'] && (
+                                        <span className="text-[10px] bg-[#eae0cd]/60 text-[#5c544d] px-1.5 py-0.5 rounded font-medium">
+                                          {cargo['Subrubro/Producto']}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {cargo.Observaciones && (
+                                      <p className="text-[10px] text-[#8c827a] truncate max-w-sm">
+                                        {cargo.Observaciones}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <span className={`text-xs font-bold font-mono ${paymentType === 'COBRO_CLIENTE' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                    {formatCurrency(cargoAmount)}
+                                  </span>
+                                  <div className="text-[9px] uppercase tracking-wider text-amber-700 font-semibold">
+                                    Pendiente
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Status Badge when selected */}
+                              {isSelected && statusInfo && (
+                                <div className="pt-1.5 border-t border-[#e0d6c8]/50 flex items-center justify-between text-[11px]">
+                                  {statusInfo.status === 'FULL' && (
+                                    <span className="inline-flex items-center gap-1 text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                      <CheckCircle2 size={12} className="text-emerald-600" />
+                                      Pasa completo a {paymentAccount} (Saldado 100%)
+                                    </span>
+                                  )}
+                                  {statusInfo.status === 'PARTIAL' && (
+                                    <span className="inline-flex items-center gap-1 text-amber-900 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                      <span>⚡ Pago parcial:</span>
+                                      <span>${formatCurrency(statusInfo.paidAmount)} a {paymentAccount}</span>
+                                      <span className="text-gray-400 font-normal">|</span>
+                                      <span>${formatCurrency(statusInfo.pendingRemainder)} resta en Pendiente</span>
+                                    </span>
+                                  )}
+                                  {statusInfo.status === 'UNPAID' && (
+                                    <span className="text-gray-500 font-medium bg-gray-50 px-2 py-0.5 rounded border border-gray-200">
+                                      El monto ingresado aún no cubre este cargo
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-[#faf7f2] rounded-xl border border-dashed border-[#e0d6c8] text-center text-xs text-[#6b645c]">
+                        No hay facturas pendientes registradas para esta cuenta. El importe se registrará como pago general o anticipo a cuenta.
+                      </div>
                     )}
                   </div>
                 )}
@@ -807,7 +1100,11 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                   <div>
                     <label className="block text-xs font-semibold text-[#6b645c] mb-1">Asignación Contable</label>
                     <div className="w-full bg-[#f4ebd8]/40 border border-[#e0d6c8] rounded-lg px-3 py-2 text-xs text-[#6b645c] font-medium flex items-center">
-                      <span>Impacta en {paymentAccount} y cancela saldo de cuenta corriente</span>
+                      {selectedCargoIds.length > 0 ? (
+                        <span>Impacta en {paymentAccount} y cambia {selectedCargoIds.length} cargo(s) de Pendiente a {paymentAccount}</span>
+                      ) : (
+                        <span>Impacta en {paymentAccount} como cobro/pago general a cuenta</span>
+                      )}
                     </div>
                   </div>
                 </div>
