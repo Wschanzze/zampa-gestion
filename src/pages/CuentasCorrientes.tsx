@@ -157,7 +157,7 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                   <td style="padding: 9px 6px; color: #333;">
                     <strong>${s.concepto}</strong>
                     ${s.subrubro ? ` - <span style="color: #666;">${s.subrubro}</span>` : ''}
-                    ${s.esContado ? ` <span style="font-size: 9px; padding: 2px 4px; background: #eee; border-radius: 3px; color: #666;">(Contado)</span>` : ''}
+                    ${s.esContado ? ` <span style="font-size: 9px; padding: 2px 4px; background: #e0f2fe; color: #0369a1; border-radius: 3px;">(${s.cuenta === 'BANCO' ? 'Pagado en Banco' : s.cuenta === 'EFECTIVO' ? 'Pagado en Efectivo' : 'Saldado'})</span>` : ''}
                     ${s.observaciones ? `<br><span style="color: #888; font-size: 10px;">${s.observaciones}</span>` : ''}
                   </td>
                   <td style="padding: 9px 6px; color: #666;">${s.cuenta || '-'}</td>
@@ -590,8 +590,8 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                                               </span>
                                             )}
                                             {s.esContado && (
-                                              <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
-                                                Contado
+                                              <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
+                                                {s.cuenta === 'BANCO' ? 'Pagado en Banco' : s.cuenta === 'EFECTIVO' ? 'Pagado en Efectivo' : 'Saldado'}
                                               </span>
                                             )}
                                           </div>

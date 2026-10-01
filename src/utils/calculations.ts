@@ -95,15 +95,9 @@ export type PendingAccount = {
 };
 
 export const isTransactionPending = (row: Transaction): boolean => {
-  if (row.Cuenta?.toUpperCase() === 'PENDIENTE') return true;
-  if (
-    row.Observaciones && 
-    /pendiente/i.test(row.Observaciones) && 
-    !/no\s+pendiente|saldad/i.test(row.Observaciones)
-  ) {
-    return true;
-  }
-  return false;
+  const cuenta = (row.Cuenta || '').toUpperCase().trim();
+  // Todo lo que sea BANCO o EFECTIVO ya está pagado/cobrado. Lo que no se pagó es lo que está en PENDIENTE.
+  return cuenta === 'PENDIENTE';
 };
 
 export const calculatePendientes = (data: Transaction[], additionalEntities?: string[]): PendingAccount[] => {
@@ -348,6 +342,7 @@ export const buildEntityStatement = (
     const ing = parseCurrency(r.Ingresos);
     const eg = parseCurrency(r.Egresos);
     const rubro = (r.Rubro || '').toUpperCase();
+    const cuenta = (r.Cuenta || '').toUpperCase();
 
     let cargo = 0;
     let abono = 0;
@@ -367,7 +362,8 @@ export const buildEntityStatement = (
         esContado = true;
         cargo = 0;
         abono = 0;
-        concepto = r.Rubro ? `${r.Rubro} (Contado)` : 'Venta de Contado';
+        const medioDesc = cuenta === 'BANCO' ? 'Banco' : cuenta === 'EFECTIVO' ? 'Efectivo' : cuenta;
+        concepto = r.Rubro ? `${r.Rubro} (Cobrado en ${medioDesc})` : `Cobrado en ${medioDesc}`;
       }
     } else {
       if (rubro.includes('PAGO PROVEEDOR')) {
@@ -382,7 +378,8 @@ export const buildEntityStatement = (
         esContado = true;
         cargo = 0;
         abono = 0;
-        concepto = r.Rubro ? `${r.Rubro} (Contado)` : 'Gasto de Contado';
+        const medioDesc = cuenta === 'BANCO' ? 'Banco' : cuenta === 'EFECTIVO' ? 'Efectivo' : cuenta;
+        concepto = r.Rubro ? `${r.Rubro} (Pagado por ${medioDesc})` : `Pagado por ${medioDesc}`;
       }
     }
 
