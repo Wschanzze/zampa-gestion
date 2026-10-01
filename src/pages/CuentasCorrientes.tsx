@@ -529,30 +529,6 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                             </div>
                           </div>
 
-                          {/* Mini Summary Cards */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="bg-white p-3 rounded-lg border border-[#e0d6c8]/80 shadow-2xs">
-                              <span className="text-[11px] font-bold text-[#6b645c] uppercase">Total Operado a Crédito</span>
-                              <p className="text-base font-bold text-[#3e3a35] mt-0.5">{formatCurrency(row.totalFacturadoCredito)}</p>
-                            </div>
-                            <div className="bg-white p-3 rounded-lg border border-[#e0d6c8]/80 shadow-2xs">
-                              <span className="text-[11px] font-bold text-[#6b645c] uppercase">Total Cancelado / Pagado</span>
-                              <p className="text-base font-bold text-emerald-700 mt-0.5">{formatCurrency(row.totalCancelado)}</p>
-                            </div>
-                            <div className={`p-3 rounded-lg border shadow-2xs ${
-                              row.saldo > 0 ? 'bg-emerald-50/70 border-emerald-200' : row.saldo < 0 ? 'bg-rose-50/70 border-rose-200' : 'bg-[#faf9f6] border-[#e0d6c8]/80'
-                            }`}>
-                              <span className="text-[11px] font-bold uppercase tracking-wider text-[#6b645c]">
-                                {row.saldo > 0 ? 'Saldo Pendiente (A Cobrar)' : row.saldo < 0 ? 'Saldo Pendiente (A Pagar)' : 'Saldo Actual'}
-                              </span>
-                              <p className={`text-base font-black mt-0.5 ${
-                                row.saldo > 0 ? 'text-emerald-700' : row.saldo < 0 ? 'text-rose-700' : 'text-gray-600'
-                              }`}>
-                                {row.saldo === 0 ? '$0 (Al Día)' : formatCurrency(Math.abs(row.saldo))}
-                              </p>
-                            </div>
-                          </div>
-
                           {/* Statement Table */}
                           {(() => {
                             const statement = buildEntityStatement(row.entity, row.tipo, data);
