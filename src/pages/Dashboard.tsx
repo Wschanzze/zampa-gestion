@@ -22,7 +22,8 @@ import {
   FileSpreadsheet,
   ChevronLeft,
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -179,6 +180,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   const [viewMode, setViewMode] = useState<'todos' | 'ingresos' | 'egresos'>('todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [rubroFilter, setRubroFilter] = useState('TODOS');
+  const [selectedIngresoCuenta, setSelectedIngresoCuenta] = useState<string | null>(null);
+  const [selectedEgresoCuenta, setSelectedEgresoCuenta] = useState<string | null>(null);
 
   // Date Range Filter States
   const [fechaDesde, setFechaDesde] = useState<string>('');
@@ -202,7 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   useEffect(() => {
     setIngresosPage(1);
     setEgresosPage(1);
-  }, [searchQuery, rubroFilter, fechaDesde, fechaHasta, selectedYear, viewMode, ingresosSortOrder, egresosSortOrder]);
+  }, [searchQuery, rubroFilter, fechaDesde, fechaHasta, selectedYear, viewMode, ingresosSortOrder, egresosSortOrder, selectedIngresoCuenta, selectedEgresoCuenta]);
 
   // Handle Preset Clicks
   const handleApplyPreset = (presetKey: string) => {
@@ -380,7 +383,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         item.Cuenta?.toLowerCase().includes(q);
 
       const matchRubro = rubroFilter === 'TODOS' || item.Rubro?.trim() === rubroFilter;
-      return matchSearch && matchRubro;
+      const matchCuenta = !selectedIngresoCuenta || (item.Cuenta?.trim() || 'Sin Especificar').toLowerCase() === selectedIngresoCuenta.toLowerCase();
+      return matchSearch && matchRubro && matchCuenta;
     });
 
     return [...list].sort((a, b) => {
@@ -391,7 +395,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       }
       return (b.id || '').localeCompare(a.id || '');
     });
-  }, [ingresosList, searchQuery, rubroFilter, ingresosSortOrder]);
+  }, [ingresosList, searchQuery, rubroFilter, selectedIngresoCuenta, ingresosSortOrder]);
 
   const filteredEgresosFeed = useMemo(() => {
     const list = egresosList.filter(item => {
@@ -401,10 +405,12 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
         item.Rubro?.toLowerCase().includes(q) ||
         item['Subrubro/Producto']?.toLowerCase().includes(q) ||
         item.Observaciones?.toLowerCase().includes(q) ||
-        item.Subactividad?.toLowerCase().includes(q);
+        item.Subactividad?.toLowerCase().includes(q) ||
+        item.Cuenta?.toLowerCase().includes(q);
 
       const matchRubro = rubroFilter === 'TODOS' || item.Rubro?.trim() === rubroFilter;
-      return matchSearch && matchRubro;
+      const matchCuenta = !selectedEgresoCuenta || (item.Cuenta?.trim() || 'Sin Especificar').toLowerCase() === selectedEgresoCuenta.toLowerCase();
+      return matchSearch && matchRubro && matchCuenta;
     });
 
     return [...list].sort((a, b) => {
@@ -415,7 +421,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       }
       return (b.id || '').localeCompare(a.id || '');
     });
-  }, [egresosList, searchQuery, rubroFilter, egresosSortOrder]);
+  }, [egresosList, searchQuery, rubroFilter, selectedEgresoCuenta, egresosSortOrder]);
 
   // Paginated Slices
   const totalIngresosPages = Math.max(1, Math.ceil(filteredIngresosFeed.length / ingresosPerPage));
@@ -932,18 +938,54 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               {(viewMode === 'todos' || viewMode === 'ingresos') && (
                 <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
-                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
-                      <CreditCard size={13} className="text-emerald-700" />
-                      <span>Cobros por Medio / Cuenta</span>
-                    </h5>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider flex items-center space-x-1.5">
+                        <CreditCard size={13} className="text-emerald-700" />
+                        <span>Cobros por Medio / Cuenta</span>
+                      </h5>
+                      {selectedIngresoCuenta && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedIngresoCuenta(null)}
+                          className="text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Quitar filtro de cuenta"
+                        >
+                          <span>Filtro: {selectedIngresoCuenta}</span>
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {ingresosByCuenta.map(c => (
-                        <div key={c.name} className="p-2 sm:p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
-                          <span className="text-[11px] font-bold text-[#2b2824] block truncate">{c.name}</span>
-                          <p className="text-xs font-bold font-mono text-emerald-800 mt-1">{formatCurrency(c.total)}</p>
-                          <span className="text-[10px] text-[#6b645c]">{c.count} reg. ({c.pct.toFixed(0)}%)</span>
-                        </div>
-                      ))}
+                      {ingresosByCuenta.map(c => {
+                        const isSelected = selectedIngresoCuenta?.toLowerCase() === c.name.toLowerCase();
+                        return (
+                          <div
+                            key={c.name}
+                            onClick={() => setSelectedIngresoCuenta(prev => prev?.toLowerCase() === c.name.toLowerCase() ? null : c.name)}
+                            className={`p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer flex flex-col justify-between select-none ${
+                              isSelected
+                                ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/30 shadow-sm scale-[1.02]'
+                                : selectedIngresoCuenta
+                                ? 'bg-[#faf9f6]/70 border-[#e0d6c8]/60 opacity-60 hover:opacity-100 hover:border-emerald-300'
+                                : 'bg-[#faf9f6] border-[#e0d6c8]/70 hover:border-emerald-400 hover:bg-emerald-50/20 hover:shadow-2xs'
+                            }`}
+                            title={`Clic para ${isSelected ? 'quitar filtro' : `filtrar cobros por ${c.name}`}`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`text-[11px] font-bold block truncate ${isSelected ? 'text-emerald-900' : 'text-[#2b2824]'}`}>
+                                {c.name}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[9px] font-extrabold uppercase bg-emerald-600 text-white px-1 rounded-sm shrink-0">
+                                  Activo
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-bold font-mono text-emerald-800 mt-1">{formatCurrency(c.total)}</p>
+                            <span className="text-[10px] text-[#6b645c]">{c.count} reg. ({c.pct.toFixed(0)}%)</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -952,18 +994,54 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
               {(viewMode === 'todos' || viewMode === 'egresos') && (
                 <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
-                    <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
-                      <CreditCard size={13} className="text-rose-700" />
-                      <span>Pagos por Medio / Cuenta</span>
-                    </h5>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider flex items-center space-x-1.5">
+                        <CreditCard size={13} className="text-rose-700" />
+                        <span>Pagos por Medio / Cuenta</span>
+                      </h5>
+                      {selectedEgresoCuenta && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEgresoCuenta(null)}
+                          className="text-[10px] font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Quitar filtro de cuenta"
+                        >
+                          <span>Filtro: {selectedEgresoCuenta}</span>
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {egresosByCuenta.map(c => (
-                        <div key={c.name} className="p-2 sm:p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
-                          <span className="text-[11px] font-bold text-[#2b2824] block truncate">{c.name}</span>
-                          <p className="text-xs font-bold font-mono text-rose-800 mt-1">{formatCurrency(c.total)}</p>
-                          <span className="text-[10px] text-[#6b645c]">{c.count} reg. ({c.pct.toFixed(0)}%)</span>
-                        </div>
-                      ))}
+                      {egresosByCuenta.map(c => {
+                        const isSelected = selectedEgresoCuenta?.toLowerCase() === c.name.toLowerCase();
+                        return (
+                          <div
+                            key={c.name}
+                            onClick={() => setSelectedEgresoCuenta(prev => prev?.toLowerCase() === c.name.toLowerCase() ? null : c.name)}
+                            className={`p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer flex flex-col justify-between select-none ${
+                              isSelected
+                                ? 'bg-rose-50/90 border-rose-500 ring-2 ring-rose-500/30 shadow-sm scale-[1.02]'
+                                : selectedEgresoCuenta
+                                ? 'bg-[#faf9f6]/70 border-[#e0d6c8]/60 opacity-60 hover:opacity-100 hover:border-rose-300'
+                                : 'bg-[#faf9f6] border-[#e0d6c8]/70 hover:border-rose-400 hover:bg-rose-50/20 hover:shadow-2xs'
+                            }`}
+                            title={`Clic para ${isSelected ? 'quitar filtro' : `filtrar pagos por ${c.name}`}`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`text-[11px] font-bold block truncate ${isSelected ? 'text-rose-900' : 'text-[#2b2824]'}`}>
+                                {c.name}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[9px] font-extrabold uppercase bg-rose-600 text-white px-1 rounded-sm shrink-0">
+                                  Activo
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-bold font-mono text-rose-800 mt-1">{formatCurrency(c.total)}</p>
+                            <span className="text-[10px] text-[#6b645c]">{c.count} reg. ({c.pct.toFixed(0)}%)</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -983,6 +1061,17 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                         <p className="text-[10px] sm:text-[11px] text-[#6b645c]">Registro simplificado ordenado por fecha</p>
                       </div>
                       <div className="flex items-center space-x-2">
+                        {selectedIngresoCuenta && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedIngresoCuenta(null)}
+                            className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 rounded border border-emerald-300 flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Quitar filtro de cuenta"
+                          >
+                            <span>Cuenta: {selectedIngresoCuenta}</span>
+                            <X size={11} />
+                          </button>
+                        )}
                         <button
                           onClick={() => setIngresosSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
                           className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border border-[#e0d6c8] bg-[#faf9f6] hover:bg-[#f4ebd8] text-[#2b2824] transition-colors"
@@ -997,7 +1086,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                           )}
                         </button>
                         <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200">
-                          {filteredIngresosFeed.length} ops
+                          {filteredIngresosFeed.length} cobros
                         </span>
                       </div>
                     </div>
@@ -1150,6 +1239,17 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                         <p className="text-[10px] sm:text-[11px] text-[#6b645c]">Registro simplificado ordenado por fecha</p>
                       </div>
                       <div className="flex items-center space-x-2">
+                        {selectedEgresoCuenta && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEgresoCuenta(null)}
+                            className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-900 hover:bg-rose-200 rounded border border-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Quitar filtro de cuenta"
+                          >
+                            <span>Cuenta: {selectedEgresoCuenta}</span>
+                            <X size={11} />
+                          </button>
+                        )}
                         <button
                           onClick={() => setEgresosSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
                           className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border border-[#e0d6c8] bg-[#faf9f6] hover:bg-[#f4ebd8] text-[#2b2824] transition-colors"
