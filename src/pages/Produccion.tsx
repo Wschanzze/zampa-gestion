@@ -545,10 +545,10 @@ const Produccion = () => {
           </h1>
           <p className="text-[#8b7355] mt-1 text-sm md:text-base">Análisis de lotes elaborados, consumo de leche, maduración y eficiencia quesera.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
           <button
             onClick={exportToExcel}
-            className="bg-[#faf9f6] hover:bg-[#f4ebd8] text-[#8b7355] border border-[#e0d6c8] px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all font-bold text-sm shadow-xs hover:border-[#8b7355]"
+            className="w-full sm:w-auto bg-[#faf9f6] hover:bg-[#f4ebd8] text-[#8b7355] border border-[#e0d6c8] px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all font-bold text-sm shadow-xs hover:border-[#8b7355]"
             title="Exportar planilla de elaboración a Excel"
           >
             <Download size={17} />
@@ -556,7 +556,7 @@ const Produccion = () => {
           </button>
           <button
             onClick={handleOpenNew}
-            className="bg-[#8b7355] hover:bg-[#735f46] text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide uppercase text-sm"
+            className="w-full sm:w-auto bg-[#8b7355] hover:bg-[#735f46] text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide uppercase text-sm"
           >
             <Plus size={18} strokeWidth={3} />
             Registrar Lote
@@ -1049,16 +1049,16 @@ const Produccion = () => {
             <p className="text-xs text-[#6b645c] mt-0.5">Historial de producción, lotes y rendimientos</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {/* Quick search input */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-initial min-w-[130px]">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b7355]" />
               <input
                 type="text"
                 placeholder="Buscar lote o queso..."
                 value={tableSearch}
                 onChange={(e) => setTableSearch(e.target.value)}
-                className="pl-8 pr-2.5 py-1.5 text-xs bg-[#faf9f6] border border-[#e0d6c8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8b7355] text-[#2b2824] w-36 sm:w-44"
+                className="pl-8 pr-2.5 py-1.5 text-xs bg-[#faf9f6] border border-[#e0d6c8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8b7355] text-[#2b2824] w-full sm:w-44"
               />
               {tableSearch && (
                 <button
@@ -1072,7 +1072,7 @@ const Produccion = () => {
 
             {/* Quick Sort Pills */}
             <div className="flex items-center space-x-1 bg-[#f4ebd8]/60 p-1 rounded-lg text-xs">
-              <span className="text-[11px] text-[#6b645c] font-semibold px-1">Ordenar:</span>
+              <span className="text-[11px] text-[#6b645c] font-semibold px-1 hidden sm:inline">Ordenar:</span>
               <button
                 onClick={() => handleSort('fecha')}
                 className={`px-2.5 py-1 rounded font-bold transition-all flex items-center space-x-1 ${
@@ -1104,10 +1104,16 @@ const Produccion = () => {
               </button>
             </div>
 
-            <span className="text-xs text-gray-500 font-medium px-2 py-1 bg-gray-50 rounded-lg border border-gray-200">
+            <span className="text-xs text-gray-500 font-medium px-2 py-1 bg-gray-50 rounded-lg border border-gray-200 ml-auto sm:ml-0">
               {sortedData.length} {sortedData.length === 1 ? 'lote' : 'lotes'}
             </span>
           </div>
+        </div>
+
+        {/* Mobile horizontal scroll hint */}
+        <div className="px-4 py-1.5 bg-[#f4ebd8]/40 border-b border-[#e0d6c8]/60 flex items-center justify-between text-[11px] text-[#8b7355] md:hidden">
+          <span>Desliza para ver más columnas &rarr;</span>
+          <span className="font-semibold">{paginatedData.length} en pantalla</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -1306,10 +1312,10 @@ const Produccion = () => {
 
         {/* Pagination Bar */}
         {sortedData.length > 0 && (
-          <div className="px-4 sm:px-6 py-3.5 bg-[#faf9f6] border-t border-[#e0d6c8] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6b645c]">
+          <div className="px-3.5 sm:px-6 py-3 bg-[#faf9f6] border-t border-[#e0d6c8] flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 text-xs text-[#6b645c]">
             {/* Left: Items per page & count info */}
             <div className="flex items-center justify-between w-full sm:w-auto space-x-3">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-medium">Mostrar:</span>
                 <select
                   value={itemsPerPage}
@@ -1319,21 +1325,22 @@ const Produccion = () => {
                   }}
                   className="px-2 py-1 bg-white border border-[#e0d6c8] rounded-lg text-xs font-bold text-[#2b2824] outline-none focus:ring-1 focus:ring-[#8b7355] cursor-pointer shadow-2xs"
                 >
-                  <option value={15}>15 por pág.</option>
-                  <option value={30}>30 por pág.</option>
-                  <option value={50}>50 por pág.</option>
+                  <option value={15}>15</option>
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
                 </select>
+                <span className="text-[11px] font-medium hidden sm:inline">por pág.</span>
               </div>
 
-              <span className="text-xs text-[#6b645c]">
-                Mostrando <strong className="text-[#2b2824]">{startIndex}</strong> - <strong className="text-[#2b2824]">{endIndex}</strong> de <strong className="text-[#2b2824]">{sortedData.length}</strong> lotes
+              <span className="text-[11px] sm:text-xs text-[#6b645c]">
+                Mostrando <strong className="text-[#2b2824]">{startIndex}</strong>-<strong className="text-[#2b2824]">{endIndex}</strong> de <strong className="text-[#2b2824]">{sortedData.length}</strong>
               </span>
             </div>
 
             {/* Right: Page navigation */}
             <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-2">
-              <span className="text-xs text-[#6b645c]">
-                Página <strong className="text-[#2b2824]">{safeCurrentPage}</strong> de <strong className="text-[#2b2824]">{totalPages}</strong>
+              <span className="text-[11px] sm:text-xs text-[#6b645c]">
+                Pág. <strong className="text-[#2b2824]">{safeCurrentPage}</strong> de <strong className="text-[#2b2824]">{totalPages}</strong>
               </span>
 
               <div className="flex items-center space-x-1">
@@ -1348,43 +1355,45 @@ const Produccion = () => {
                   <ChevronLeft size={16} />
                 </button>
 
-                {/* Page numbers (up to 5 page buttons or ellipsis) */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => {
-                    if (p === 1 || p === totalPages) return true;
-                    if (Math.abs(p - safeCurrentPage) <= 1) return true;
-                    return false;
-                  })
-                  .reduce<(number | string)[]>((acc, p, idx, arr) => {
-                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
-                      acc.push(`dots-${p}`);
-                    }
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((item) => {
-                    if (typeof item === 'string') {
+                {/* Number buttons on sm+ screens */}
+                <div className="hidden sm:flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => {
+                      if (p === 1 || p === totalPages) return true;
+                      if (Math.abs(p - safeCurrentPage) <= 1) return true;
+                      return false;
+                    })
+                    .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+                        acc.push(`dots-${p}`);
+                      }
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((item) => {
+                      if (typeof item === 'string') {
+                        return (
+                          <span key={item} className="px-1 text-gray-400 select-none">
+                            ...
+                          </span>
+                        );
+                      }
                       return (
-                        <span key={item} className="px-1 text-gray-400 select-none">
-                          ...
-                        </span>
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setCurrentPage(item)}
+                          className={`min-w-7 h-7 px-2 text-xs font-bold rounded-lg transition-colors ${
+                            safeCurrentPage === item
+                              ? 'bg-[#8b7355] text-white shadow-2xs'
+                              : 'bg-white border border-[#e0d6c8] text-[#2b2824] hover:bg-[#f4ebd8]/50'
+                          }`}
+                        >
+                          {item}
+                        </button>
                       );
-                    }
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setCurrentPage(item)}
-                        className={`min-w-7 h-7 px-2 text-xs font-bold rounded-lg transition-colors ${
-                          safeCurrentPage === item
-                            ? 'bg-[#8b7355] text-white shadow-2xs'
-                            : 'bg-white border border-[#e0d6c8] text-[#2b2824] hover:bg-[#f4ebd8]/50'
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    );
-                  })}
+                    })}
+                </div>
 
                 {/* Next Page */}
                 <button
@@ -1538,21 +1547,21 @@ const Produccion = () => {
               </form>
             </div>
             
-            <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
+            <div className="p-4 sm:p-5 border-t border-gray-200 bg-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3 rounded-b-2xl">
               <button 
                 type="button" 
                 onClick={() => {
                   setIsModalOpen(false);
                   setEditingRecordId(null);
                 }}
-                className="px-5 py-2.5 font-medium rounded-xl text-gray-600 hover:bg-gray-200 transition-colors"
+                className="w-full sm:w-auto px-5 py-2.5 font-medium rounded-xl text-gray-600 hover:bg-gray-200 transition-colors text-center justify-center"
               >
                 Cancelar
               </button>
               <button 
                 type="submit" 
                 form="produccion-form"
-                className="px-6 py-2.5 font-bold uppercase tracking-wide text-sm bg-[#8b7355] text-white rounded-xl hover:bg-[#735f46] transition-all shadow-sm hover:shadow-md"
+                className="w-full sm:w-auto px-6 py-2.5 font-bold uppercase tracking-wide text-sm bg-[#8b7355] text-white rounded-xl hover:bg-[#735f46] transition-all shadow-sm hover:shadow-md text-center justify-center"
               >
                 {editingRecordId ? 'Guardar Cambios' : 'Guardar Registro'}
               </button>

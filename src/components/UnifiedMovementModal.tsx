@@ -408,27 +408,29 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('TRANSACCION')}
-                className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center space-x-2 ${
+                className={`flex-1 py-2 px-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 sm:space-x-2 text-center ${
                   activeTab === 'TRANSACCION'
                     ? 'bg-white text-[#2b2824] shadow-sm border border-[#e0d6c8]/80'
                     : 'text-[#6b645c] hover:text-[#2b2824]'
                 }`}
               >
-                <Receipt size={16} className={activeTab === 'TRANSACCION' ? 'text-[#8b7355]' : 'text-gray-400'} />
-                <span>Transacción Comercial (Ventas / Gastos / Quesos)</span>
+                <Receipt size={16} className={activeTab === 'TRANSACCION' ? 'text-[#8b7355] shrink-0' : 'text-gray-400 shrink-0'} />
+                <span className="hidden sm:inline">Transacción Comercial (Ventas / Gastos / Quesos)</span>
+                <span className="sm:hidden">Transacción</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('CUENTA_CORRIENTE')}
-                className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center space-x-2 ${
+                className={`flex-1 py-2 px-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 sm:space-x-2 text-center ${
                   activeTab === 'CUENTA_CORRIENTE'
                     ? 'bg-white text-[#2b2824] shadow-sm border border-[#e0d6c8]/80'
                     : 'text-[#6b645c] hover:text-[#2b2824]'
                 }`}
               >
-                <WalletCards size={16} className={activeTab === 'CUENTA_CORRIENTE' ? 'text-emerald-700' : 'text-gray-400'} />
-                <span>Cobro / Pago Cta. Cte. (Saldar Deudas)</span>
+                <WalletCards size={16} className={activeTab === 'CUENTA_CORRIENTE' ? 'text-emerald-700 shrink-0' : 'text-gray-400 shrink-0'} />
+                <span className="hidden sm:inline">Cobro / Pago Cta. Cte. (Saldar Deudas)</span>
+                <span className="sm:hidden">Cobro / Pago Cta. Cte.</span>
               </button>
             </div>
           </div>
@@ -655,17 +657,17 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
               </div>
 
               {/* Actions Footer */}
-              <div className="p-4 border-t border-[#e0d6c8] bg-[#faf9f6] flex justify-end space-x-3 shrink-0">
+              <div className="p-3.5 sm:p-4 border-t border-[#e0d6c8] bg-[#faf9f6] flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 shrink-0">
                 <button 
                   type="button" 
                   onClick={onClose} 
-                  className="px-4 py-2 border border-[#e0d6c8] text-[#6b645c] rounded-xl text-sm hover:bg-[#f4ebd8] font-semibold transition-colors bg-white"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-[#e0d6c8] text-[#6b645c] rounded-xl text-sm hover:bg-[#f4ebd8] font-semibold transition-colors bg-white text-center justify-center"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
-                  className={`px-5 py-2 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center space-x-1.5 ${
+                  className={`w-full sm:w-auto px-5 py-2.5 sm:py-2 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center justify-center space-x-1.5 ${
                     tipoMovimiento === 'INGRESO' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
                   }`}
                 >
@@ -825,18 +827,18 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
               </div>
 
               {/* Actions Footer */}
-              <div className="p-4 border-t border-[#e0d6c8] bg-[#faf9f6] flex justify-end space-x-3 shrink-0">
+              <div className="p-3.5 sm:p-4 border-t border-[#e0d6c8] bg-[#faf9f6] flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 shrink-0">
                 <button 
                   type="button" 
                   onClick={onClose} 
-                  className="px-4 py-2 border border-[#e0d6c8] text-[#6b645c] rounded-xl text-sm hover:bg-[#f4ebd8] font-semibold transition-colors bg-white"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-[#e0d6c8] text-[#6b645c] rounded-xl text-sm hover:bg-[#f4ebd8] font-semibold transition-colors bg-white text-center justify-center"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
                   disabled={paymentSubmitting}
-                  className={`px-5 py-2 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center space-x-1.5 ${
+                  className={`w-full sm:w-auto px-5 py-2.5 sm:py-2 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center justify-center space-x-1.5 ${
                     paymentType === 'COBRO_CLIENTE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
                   }`}
                 >
