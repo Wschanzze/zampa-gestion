@@ -180,7 +180,7 @@ export const useSupabaseTransactions = () => {
     }
 
     const isCobro = payment.type === 'COBRO_CLIENTE';
-    const subactividad = payment.subactividad || (isCobro ? 'QUESERIA' : 'TAMBO');
+    const subactividad = payment.subactividad || 'QUESERIA';
 
     // 1. Real movement in chosen financial account (BANCO, EFECTIVO)
     const realMovement = {

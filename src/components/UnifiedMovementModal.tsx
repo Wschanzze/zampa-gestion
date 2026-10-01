@@ -109,7 +109,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
   const [tipoMovimiento, setTipoMovimiento] = useState<'INGRESO' | 'EGRESO'>('INGRESO');
   const [formData, setFormData] = useState<Partial<Transaction>>({
     Fecha: getTodayDisplayDate(),
-    Subactividad: 'TAMBO',
+    Subactividad: 'QUESERIA',
     Cuenta: 'BANCO',
     Ingresos: 0,
     Egresos: 0,
@@ -138,7 +138,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
       cuents.add('PENDIENTE');
     }
     if (unids.size === 0) {
-      ['TAMBO', 'RECRÍA', 'QUESERÍA', 'COMÚN'].forEach(u => unids.add(u));
+      ['QUESERIA', 'TAMBO', 'RECRIA', 'COMUN'].forEach(u => unids.add(u));
     }
 
     existingData.forEach(item => {
@@ -180,7 +180,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
       if (!initialTransactionData) {
         setFormData({
           Fecha: getTodayDisplayDate(),
-          Subactividad: 'TAMBO',
+          Subactividad: 'QUESERIA',
           Cuenta: 'BANCO',
           Ingresos: 0,
           Egresos: 0,

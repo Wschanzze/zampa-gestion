@@ -26,7 +26,7 @@ const TransactionForm: React.FC<Props> = ({
   const [tipoMovimiento, setTipoMovimiento] = useState<'INGRESO' | 'EGRESO'>('INGRESO');
   const [formData, setFormData] = useState<Partial<Transaction>>({
     Fecha: new Date().toLocaleDateString('es-AR'),
-    Subactividad: 'TAMBO',
+    Subactividad: 'QUESERIA',
     Cuenta: 'BANCO',
     Ingresos: 0,
     Egresos: 0,
@@ -56,7 +56,7 @@ const TransactionForm: React.FC<Props> = ({
       cuents.add('PENDIENTE');
     }
     if (unids.size === 0) {
-      ['TAMBO', 'RECRÍA', 'QUESERÍA', 'COMÚN'].forEach(u => unids.add(u));
+      ['QUESERIA', 'TAMBO', 'RECRIA', 'COMUN'].forEach(u => unids.add(u));
     }
 
     // Also include existing data just in case there are legacy items
