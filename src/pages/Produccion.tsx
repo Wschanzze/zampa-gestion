@@ -23,7 +23,6 @@ import {
   Search,
   Download,
   AlertTriangle,
-  Boxes,
   Milk,
   BarChart3,
   Award
@@ -285,18 +284,6 @@ const Produccion = () => {
   const averageYield = totalLitros > 0 ? (totalKg / totalLitros) * 100 : 0;
   const litrosPorKg = totalKg > 0 ? totalLitros / totalKg : 0;
   const totalLotes = filteredData.length;
-
-  // Total de piezas físicas elaboradas (hormas grandes, barras, tubos, chicos, etc.)
-  const totalPiezas = filteredData.reduce((acc, curr) => {
-    return acc + 
-      (Number(curr.cantidad_grande) || 0) +
-      (Number(curr.cantidad_barra) || 0) +
-      (Number(curr.cantidad_tubo) || 0) +
-      (Number(curr.cantidad_chico) || 0) +
-      (Number(curr.cantidad_camambert) || 0) +
-      (Number(curr.cantidad_ricota) || 0) +
-      (Number(curr.cantidad_otro) || 0);
-  }, 0);
 
   // Desglose de rendimiento y volumen por variedad
   const varietyStats = useMemo(() => {
@@ -654,8 +641,8 @@ const Produccion = () => {
         </div>
       </div>
 
-      {/* KPI Cards Grid (6 Métricas Clave) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+      {/* KPI Cards Grid (5 Métricas Clave) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
         
         {/* Leche Procesada */}
         <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
@@ -715,22 +702,6 @@ const Produccion = () => {
             </div>
             <div className="p-2 bg-[#f4ebd8] text-[#8b7355] rounded-xl border border-[#e0d6c8]">
               <Milk size={18} />
-            </div>
-          </div>
-        </div>
-
-        {/* Hormas / Piezas Físicas */}
-        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Piezas Elaboradas</p>
-              <h3 className="text-xl font-black text-[#2b2824] mt-1 font-mono">
-                {totalPiezas.toLocaleString()} <span className="text-xs font-semibold">U</span>
-              </h3>
-              <span className="text-[10px] text-gray-400">Grandes, barras, tubos, etc.</span>
-            </div>
-            <div className="p-2 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
-              <Boxes size={18} />
             </div>
           </div>
         </div>
