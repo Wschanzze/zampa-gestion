@@ -257,6 +257,29 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
   const resultadoNeto = summary.TOTAL.resultado;
   const margenOperativo = totalIngresos > 0 ? ((resultadoNeto / totalIngresos) * 100).toFixed(1) : '0';
 
+  // Desglose de Facturación / Ingresos por Cuenta (Banco vs Pendiente) para la card de KPI
+  const ingresosBreakdown = useMemo(() => {
+    let banco = 0;
+    let pendiente = 0;
+    let efectivo = 0;
+
+    filteredData.forEach(row => {
+      const ing = parseCurrency(row.Ingresos);
+      if (ing > 0) {
+        const c = (row.Cuenta || '').trim().toUpperCase();
+        if (c.includes('BANCO')) {
+          banco += ing;
+        } else if (c.includes('PENDIENTE')) {
+          pendiente += ing;
+        } else if (c.includes('EFECTIVO')) {
+          efectivo += ing;
+        }
+      }
+    });
+
+    return { banco, pendiente, efectivo };
+  }, [filteredData]);
+
   // Cheese sales total kg
   const totalCheeseKg = useMemo(() => {
     return filteredData.reduce((acc, row) => {
@@ -481,52 +504,79 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             
             {/* Ingresos Totales */}
-            <div className="bg-white/95 p-4 rounded-xl border border-emerald-200 shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between text-emerald-800 text-xs font-bold uppercase tracking-wider">
-                <span>Ingresos Totales</span>
-                <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-700">
-                  <DollarSign size={16} />
+            <div className="bg-white/95 p-4 rounded-xl border border-emerald-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-emerald-800 text-xs font-bold uppercase tracking-wider">
+                  <span>Ingresos Totales</span>
+                  <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-700">
+                    <DollarSign size={16} />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-emerald-700 mt-2 font-mono">
+                  {formatCurrency(totalIngresos)}
+                </p>
+                <div className="flex items-center space-x-1 text-[11px] text-[#6b645c] mt-1">
+                  <span className="text-emerald-700 font-semibold flex items-center">
+                    <ArrowUpRight size={13} /> Facturación
+                  </span>
+                  <span>en el período</span>
                 </div>
               </div>
-              <p className="text-2xl font-black text-emerald-700 mt-2 font-mono">
-                {formatCurrency(totalIngresos)}
-              </p>
-              <div className="flex items-center space-x-1 text-[11px] text-[#6b645c] mt-1">
-                <span className="text-emerald-700 font-semibold flex items-center">
-                  <ArrowUpRight size={13} /> Facturación
-                </span>
-                <span>en el período</span>
+
+              {/* Desglose Banco vs Pendiente */}
+              <div className="mt-2.5 pt-2 border-t border-emerald-100 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px]">
+                <div className="flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
+                  <span className="text-[#6b645c]">Banco:</span>
+                  <strong className="font-mono font-bold text-blue-900">{formatCurrency(ingresosBreakdown.banco)}</strong>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                  <span className="text-[#6b645c]">Pendiente:</span>
+                  <strong className="font-mono font-bold text-amber-900">{formatCurrency(ingresosBreakdown.pendiente)}</strong>
+                </div>
+                {ingresosBreakdown.efectivo > 0 && (
+                  <div className="flex items-center space-x-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                    <span className="text-[#6b645c]">Efectivo:</span>
+                    <strong className="font-mono font-bold text-emerald-900">{formatCurrency(ingresosBreakdown.efectivo)}</strong>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Egresos Totales */}
-            <div className="bg-white/95 p-4 rounded-xl border border-rose-200 shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between text-rose-800 text-xs font-bold uppercase tracking-wider">
-                <span>Costos y Egresos</span>
-                <div className="p-1.5 bg-rose-50 rounded-lg text-rose-700">
-                  <TrendingDown size={16} />
+            <div className="bg-white/95 p-4 rounded-xl border border-rose-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-rose-800 text-xs font-bold uppercase tracking-wider">
+                  <span>Costos y Egresos</span>
+                  <div className="p-1.5 bg-rose-50 rounded-lg text-rose-700">
+                    <TrendingDown size={16} />
+                  </div>
                 </div>
+                <p className="text-2xl font-black text-rose-700 mt-2 font-mono">
+                  {formatCurrency(totalEgresos)}
+                </p>
               </div>
-              <p className="text-2xl font-black text-rose-700 mt-2 font-mono">
-                {formatCurrency(totalEgresos)}
-              </p>
-              <div className="flex items-center space-x-1 text-[11px] text-[#6b645c] mt-1">
+              <div className="flex items-center space-x-1 text-[11px] text-[#6b645c] mt-2.5 pt-2 border-t border-rose-100">
                 <span>Gastos operativos del tambo</span>
               </div>
             </div>
 
             {/* Resultado Neto */}
-            <div className={`bg-white/95 p-4 rounded-xl border ${resultadoNeto >= 0 ? 'border-amber-300' : 'border-rose-300'} shadow-sm relative overflow-hidden`}>
-              <div className="flex items-center justify-between text-[#2b2824] text-xs font-bold uppercase tracking-wider">
-                <span>Resultado Operativo</span>
-                <div className={`p-1.5 rounded-lg ${resultadoNeto >= 0 ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800'}`}>
-                  <TrendingUp size={16} />
+            <div className={`bg-white/95 p-4 rounded-xl border ${resultadoNeto >= 0 ? 'border-amber-300' : 'border-rose-300'} shadow-sm relative overflow-hidden flex flex-col justify-between`}>
+              <div>
+                <div className="flex items-center justify-between text-[#2b2824] text-xs font-bold uppercase tracking-wider">
+                  <span>Resultado Operativo</span>
+                  <div className={`p-1.5 rounded-lg ${resultadoNeto >= 0 ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800'}`}>
+                    <TrendingUp size={16} />
+                  </div>
                 </div>
+                <p className={`text-2xl font-black mt-2 font-mono ${resultadoNeto >= 0 ? 'text-amber-950' : 'text-rose-700'}`}>
+                  {formatCurrency(resultadoNeto)}
+                </p>
               </div>
-              <p className={`text-2xl font-black mt-2 font-mono ${resultadoNeto >= 0 ? 'text-amber-950' : 'text-rose-700'}`}>
-                {formatCurrency(resultadoNeto)}
-              </p>
-              <div className="flex items-center space-x-2 text-[11px] mt-1">
+              <div className="flex items-center space-x-2 text-[11px] mt-2.5 pt-2 border-t border-[#f4ebd8]">
                 <span className={`px-1.5 py-0.5 rounded font-bold ${resultadoNeto >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
                   Margen: {margenOperativo}%
                 </span>
@@ -535,17 +585,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
             </div>
 
             {/* Volumen de Quesería */}
-            <div className="bg-white/95 p-4 rounded-xl border border-[#e0d6c8] shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between text-[#2b2824] text-xs font-bold uppercase tracking-wider">
-                <span>Volumen Quesería</span>
-                <div className="p-1.5 bg-[#f4ebd8] rounded-lg text-[#8b7355]">
-                  <Package size={16} />
+            <div className="bg-white/95 p-4 rounded-xl border border-[#e0d6c8] shadow-sm relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-[#2b2824] text-xs font-bold uppercase tracking-wider">
+                  <span>Volumen Quesería</span>
+                  <div className="p-1.5 bg-[#f4ebd8] rounded-lg text-[#8b7355]">
+                    <Package size={16} />
+                  </div>
                 </div>
+                <p className="text-2xl font-black text-[#2b2824] mt-2 font-mono">
+                  {formatKg(totalCheeseKg)}
+                </p>
               </div>
-              <p className="text-2xl font-black text-[#2b2824] mt-2 font-mono">
-                {formatKg(totalCheeseKg)}
-              </p>
-              <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-1">
+              <div className="flex items-center justify-between text-[11px] text-[#6b645c] mt-2.5 pt-2 border-t border-[#f4ebd8]">
                 <span>Comercializados</span>
                 <button 
                   onClick={() => navigate('/queseria')} 
