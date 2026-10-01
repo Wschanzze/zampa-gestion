@@ -4,7 +4,7 @@ import { normalizeDecimal, parseDecimalNumber } from '../utils/calculations';
 import { useListas } from '../lib/api';
 import ComboboxSelect from './ComboboxSelect';
 // @ts-ignore
-import { X, Sparkles, Calculator, ArrowDownLeft, ArrowUpRight, DollarSign, WalletCards, Receipt } from 'lucide-react';
+import { X, Sparkles, Calculator, ArrowDownLeft, ArrowUpRight, DollarSign, WalletCards, Receipt, Calendar } from 'lucide-react';
 
 interface UnifiedMovementModalProps {
   isOpen: boolean;
@@ -39,6 +39,51 @@ const formatCurrency = (val: number) => {
   }).format(Math.abs(val));
 };
 
+// Date conversion utilities for <input type="date"> (YYYY-MM-DD) <-> App storage (D/M/YYYY or DD/MM/YYYY)
+const getTodayDisplayDate = (): string => {
+  const now = new Date();
+  return `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+};
+
+const toISODateString = (val?: string): string => {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split('/');
+    if (parts.length === 3) {
+      const day = parts[0].trim().padStart(2, '0');
+      const month = parts[1].trim().padStart(2, '0');
+      let year = parts[2].trim();
+      if (year.length === 2) year = `20${year}`;
+      return `${year}-${month}-${day}`;
+    }
+  }
+  if (trimmed.includes('T')) {
+    return trimmed.split('T')[0];
+  }
+  return '';
+};
+
+const toDisplayDateString = (isoVal: string): string => {
+  if (!isoVal) return '';
+  const trimmed = isoVal.trim();
+  if (trimmed.includes('-')) {
+    const parts = trimmed.split('-');
+    if (parts.length === 3) {
+      const y = parts[0].trim();
+      const m = parseInt(parts[1].trim(), 10);
+      const d = parseInt(parts[2].trim(), 10);
+      if (!isNaN(m) && !isNaN(d) && y) {
+        return `${d}/${m}/${y}`;
+      }
+    }
+  }
+  return trimmed;
+};
+
 const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
   isOpen,
   onClose,
@@ -63,7 +108,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
   // -------------------------------------------------------------
   const [tipoMovimiento, setTipoMovimiento] = useState<'INGRESO' | 'EGRESO'>('INGRESO');
   const [formData, setFormData] = useState<Partial<Transaction>>({
-    Fecha: new Date().toLocaleDateString('es-AR'),
+    Fecha: getTodayDisplayDate(),
     Subactividad: 'TAMBO',
     Cuenta: 'BANCO',
     Ingresos: 0,
@@ -122,7 +167,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
   const [paymentType, setPaymentType] = useState<'COBRO_CLIENTE' | 'PAGO_PROVEEDOR'>(initialPaymentType);
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentAccount, setPaymentAccount] = useState('BANCO');
-  const [paymentDate, setPaymentDate] = useState(new Date().toLocaleDateString('es-AR'));
+  const [paymentDate, setPaymentDate] = useState(getTodayDisplayDate());
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
@@ -132,8 +177,28 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
       setActiveTab(initialMode);
       if (initialEntity) setPaymentEntity(initialEntity);
       if (initialPaymentType) setPaymentType(initialPaymentType);
+      if (!initialTransactionData) {
+        setFormData({
+          Fecha: getTodayDisplayDate(),
+          Subactividad: 'TAMBO',
+          Cuenta: 'BANCO',
+          Ingresos: 0,
+          Egresos: 0,
+          Cantidades: 0,
+          Pecorino: 0,
+          Manchego: 0,
+          Saborizado: 0,
+          Ahumado: 0,
+          Provoleta: 0,
+          Ricota: 0,
+        });
+        setTipoMovimiento('INGRESO');
+        setPaymentDate(getTodayDisplayDate());
+        setPaymentAmount('');
+        setPaymentNotes('');
+      }
     }
-  }, [isOpen, initialMode, initialEntity, initialPaymentType]);
+  }, [isOpen, initialMode, initialEntity, initialPaymentType, initialTransactionData]);
 
   // Load initialTransactionData when in Edit mode
   useEffect(() => {
@@ -142,6 +207,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
       setTipoMovimiento(isIngreso ? 'INGRESO' : 'EGRESO');
       setFormData({
         ...initialTransactionData,
+        Fecha: initialTransactionData.Fecha || getTodayDisplayDate(),
         Ingresos: Number(initialTransactionData.Ingresos) || 0,
         Egresos: Number(initialTransactionData.Egresos) || 0,
         Cantidades: Number(initialTransactionData.Cantidades) || 0,
@@ -416,17 +482,26 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
                   {/* Fecha */}
                   <div>
-                    <label className="block text-xs font-semibold text-[#6b645c] mb-1">
-                      Fecha (D/M/AAAA) <span className="text-rose-600">*</span>
+                    <label className="text-xs font-semibold text-[#6b645c] mb-1 flex items-center gap-1.5">
+                      <Calendar size={13} className="text-[#8b7355]" />
+                      <span>Fecha</span>
+                      <span className="text-rose-600">*</span>
                     </label>
                     <input 
                       required 
-                      type="text" 
+                      type="date" 
                       name="Fecha" 
-                      placeholder="22/9/2026" 
-                      value={formData.Fecha || ''} 
-                      onChange={handleTxChange} 
-                      className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] focus:border-[#8b7355] outline-none font-medium" 
+                      value={toISODateString(formData.Fecha)} 
+                      onChange={(e) => {
+                        const isoVal = e.target.value;
+                        setFormData(prev => ({ ...prev, Fecha: toDisplayDateString(isoVal) }));
+                      }} 
+                      onClick={(e) => {
+                        try {
+                          (e.currentTarget as any).showPicker?.();
+                        } catch {}
+                      }}
+                      className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] focus:border-[#8b7355] outline-none font-medium cursor-pointer" 
                     />
                   </div>
 
@@ -708,13 +783,22 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                 {/* Fecha y Unidad de Negocio */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-[#6b645c] mb-1">Fecha (D/M/AAAA)</label>
+                    <label className="text-xs font-semibold text-[#6b645c] mb-1 flex items-center gap-1.5">
+                      <Calendar size={13} className="text-[#8b7355]" />
+                      <span>Fecha del Cobro / Pago</span>
+                      <span className="text-rose-600">*</span>
+                    </label>
                     <input 
                       required
-                      type="text" 
-                      value={paymentDate} 
-                      onChange={(e) => setPaymentDate(e.target.value)} 
-                      className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none" 
+                      type="date" 
+                      value={toISODateString(paymentDate)} 
+                      onChange={(e) => setPaymentDate(toDisplayDateString(e.target.value))} 
+                      onClick={(e) => {
+                        try {
+                          (e.currentTarget as any).showPicker?.();
+                        } catch {}
+                      }}
+                      className="w-full border border-[#e0d6c8] bg-white rounded-lg px-3 py-2 text-base md:text-sm text-[#3e3a35] focus:ring-1 focus:ring-[#8b7355] outline-none cursor-pointer font-medium" 
                     />
                   </div>
 
