@@ -12,8 +12,7 @@ import CargaOperario from './pages/CargaOperario';
 import Listas from './pages/Listas';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
-import TransactionForm from './components/TransactionForm';
-import PaymentModal from './components/PaymentModal';
+import UnifiedMovementModal from './components/UnifiedMovementModal';
 
 import { useSupabaseTransactions, useListas } from './lib/api';
 import { supabase } from './lib/supabase';
@@ -24,8 +23,17 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
-  const [isGlobalPaymentModalOpen, setIsGlobalPaymentModalOpen] = useState(false);
+  const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
+  const [unifiedModalInitialMode, setUnifiedModalInitialMode] = useState<'TRANSACCION' | 'CUENTA_CORRIENTE'>('TRANSACCION');
+  const [unifiedModalInitialEntity, setUnifiedModalInitialEntity] = useState<string>('');
+  const [unifiedModalInitialType, setUnifiedModalInitialType] = useState<'COBRO_CLIENTE' | 'PAGO_PROVEEDOR'>('COBRO_CLIENTE');
+
+  const handleOpenUnifiedModal = (mode: 'TRANSACCION' | 'CUENTA_CORRIENTE' = 'TRANSACCION', entity = '', type: 'COBRO_CLIENTE' | 'PAGO_PROVEEDOR' = 'COBRO_CLIENTE') => {
+    setUnifiedModalInitialMode(mode);
+    setUnifiedModalInitialEntity(entity);
+    setUnifiedModalInitialType(type);
+    setIsUnifiedModalOpen(true);
+  };
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -181,34 +189,23 @@ function App() {
         </div>
 
         <nav className="flex-1 px-4 py-4 space-y-2 relative z-10 overflow-y-auto">
-          {/* Quick Action Mobile */}
-          <div className="pb-3 mb-2 border-b border-[#e0d6c8]/40 space-y-2">
+          {/* Quick Action Mobile - Unified Green & Red Button */}
+          <div className="pb-3 mb-2 border-b border-[#e0d6c8]/40">
             <button 
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                setIsGlobalModalOpen(true);
+                handleOpenUnifiedModal('TRANSACCION');
               }}
-              className="w-full flex items-center justify-center space-x-2 bg-[#8b7355] text-white px-4 py-3 rounded-xl hover:bg-[#7a6448] shadow-md transition-all font-bold"
-            >
-              <Plus size={20} />
-              <span>Nuevo Movimiento</span>
-            </button>
-
-            <button 
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                setIsGlobalPaymentModalOpen(true);
-              }}
-              className="w-full flex items-center justify-center space-x-2 text-white px-4 py-3 rounded-xl shadow-md transition-all hover:brightness-105 active:scale-[0.98] font-bold border border-white/20"
+              className="w-full flex items-center justify-between text-white px-4 py-3 rounded-xl shadow-md transition-all hover:brightness-110 active:scale-[0.98] font-bold border border-white/20"
               style={{
                 background: 'linear-gradient(90deg, #15803d 0%, #16a34a 50%, #dc2626 50%, #b91c1c 100%)'
               }}
             >
-              <ArrowDownLeft size={18} className="flex-shrink-0 drop-shadow-sm" />
-              <span className="text-sm font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
-                Registrar Cobro / Pago Parcial
+              <ArrowDownLeft size={18} className="flex-shrink-0 drop-shadow-sm text-emerald-100" />
+              <span className="text-sm font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+                Registrar Movimiento
               </span>
-              <ArrowUpRight size={18} className="flex-shrink-0 drop-shadow-sm" />
+              <ArrowUpRight size={18} className="flex-shrink-0 drop-shadow-sm text-rose-100" />
             </button>
           </div>
 
@@ -304,8 +301,7 @@ function App() {
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         setIsCollapsed={setIsSidebarCollapsed} 
-        onNewTransaction={() => setIsGlobalModalOpen(true)}
-        onRegisterPayment={() => setIsGlobalPaymentModalOpen(true)}
+        onNewTransaction={() => handleOpenUnifiedModal('TRANSACCION')}
       />
 
       {/* Main Content Area */}
@@ -380,33 +376,30 @@ function App() {
         </div>
       </main>
 
-      {/* Global Floating Action Button */}
+      {/* Global Floating Action Button with Bicromatic Green & Red Design */}
       <button
-        onClick={() => setIsGlobalModalOpen(true)}
-        className="fixed bottom-6 md:bottom-8 right-5 md:right-8 w-14 h-14 bg-[#8b7355] text-white rounded-full shadow-[0_4px_12px_rgba(139,115,85,0.4)] flex items-center justify-center hover:bg-[#7a6448] hover:scale-105 active:scale-95 transition-all z-[90]"
-        title="Registrar Nuevo Movimiento"
+        onClick={() => handleOpenUnifiedModal('TRANSACCION')}
+        className="fixed bottom-6 md:bottom-8 right-5 md:right-8 w-14 h-14 text-white rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.3)] flex items-center justify-center hover:brightness-110 hover:scale-105 active:scale-95 transition-all z-[90] border-2 border-white/40"
+        style={{
+          background: 'linear-gradient(135deg, #16a34a 0%, #16a34a 48%, #dc2626 52%, #dc2626 100%)'
+        }}
+        title="Registrar Movimiento"
       >
-        <Plus size={28} />
+        <Plus size={28} className="drop-shadow-sm text-white font-black" strokeWidth={2.8} />
       </button>
 
-      {/* Global Transaction Modal */}
-      {isGlobalModalOpen && (
-        <TransactionForm
+      {/* Global Unified Movement Modal */}
+      {isUnifiedModalOpen && (
+        <UnifiedMovementModal
+          isOpen={isUnifiedModalOpen}
+          onClose={() => setIsUnifiedModalOpen(false)}
+          initialMode={unifiedModalInitialMode}
+          onAddTransaction={handleAddTransaction}
+          onUpdateTransaction={handleUpdateTransaction}
           existingData={data}
-          onAdd={handleAddTransaction}
-          onClose={() => setIsGlobalModalOpen(false)}
-        />
-      )}
-
-      {/* Global Payment Modal (Cobro / Pago Parcial) */}
-      {isGlobalPaymentModalOpen && (
-        <PaymentModal
-          isOpen={isGlobalPaymentModalOpen}
-          onClose={() => setIsGlobalPaymentModalOpen(false)}
-          onRegister={registerPayment}
-          initialEntity=""
-          initialType="COBRO_CLIENTE"
-          pendingBalance={0}
+          onRegisterPayment={registerPayment}
+          initialEntity={unifiedModalInitialEntity}
+          initialPaymentType={unifiedModalInitialType}
           availableEntities={availableEntities}
         />
       )}

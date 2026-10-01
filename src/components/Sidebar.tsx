@@ -14,7 +14,6 @@ import {
   ChevronDown,
   ChevronUp,
   Beaker,
-  Plus,
   ArrowDownLeft,
   ArrowUpRight
 } from 'lucide-react';
@@ -117,45 +116,32 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, onNaviga
         </div>
       </div>
       
-      {/* Quick Actions */}
+      {/* Quick Action - Unified Green & Red Button */}
       {(onNewTransaction || onRegisterPayment) && (
-        <div className="px-3 pt-3.5 pb-2 relative z-10 border-b border-[#e0d6c8]/40 mx-2 mb-2 space-y-2">
-          {onNewTransaction && (
-            <button 
-              onClick={onNewTransaction}
-              title="Registrar Movimiento"
-              className={`w-full flex items-center justify-center space-x-2 bg-[#8b7355] text-white py-2.5 rounded-xl hover:bg-[#7a6448] shadow-sm transition-all font-bold ${isCollapsed ? 'px-0' : 'px-2'}`}
-            >
-              <Plus size={18} className="flex-shrink-0" />
-              <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>Nuevo Mov.</span>
-            </button>
-          )}
-
-          {onRegisterPayment && (
-            <button 
-              onClick={onRegisterPayment}
-              title="Registrar Cobro / Pago Parcial (Cuentas Corrientes)"
-              className={`w-full flex items-center justify-center relative overflow-hidden text-white py-2.5 rounded-xl shadow-sm transition-all hover:brightness-105 active:scale-[0.98] font-bold border border-white/20 ${isCollapsed ? 'px-0' : 'px-2'}`}
-              style={{
-                background: 'linear-gradient(90deg, #15803d 0%, #16a34a 50%, #dc2626 50%, #b91c1c 100%)'
-              }}
-            >
-              {isCollapsed ? (
-                <div className="flex items-center justify-center space-x-0.5">
-                  <ArrowDownLeft size={15} className="text-white drop-shadow-sm" />
-                  <ArrowUpRight size={15} className="text-white drop-shadow-sm" />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center space-x-1.5 w-full text-center">
-                  <ArrowDownLeft size={15} className="flex-shrink-0 drop-shadow-sm" />
-                  <span className="text-[11px] leading-tight font-black tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] whitespace-normal">
-                    Registrar Cobro / Pago Parcial
-                  </span>
-                  <ArrowUpRight size={15} className="flex-shrink-0 drop-shadow-sm" />
-                </div>
-              )}
-            </button>
-          )}
+        <div className="px-3 pt-3.5 pb-2 relative z-10 border-b border-[#e0d6c8]/40 mx-2 mb-2">
+          <button 
+            onClick={onNewTransaction || onRegisterPayment}
+            title="Registrar Movimiento (Ingresos, Cobros, Gastos y Pagos)"
+            className={`w-full flex items-center justify-center relative overflow-hidden text-white py-2.5 rounded-xl shadow-sm transition-all hover:brightness-110 active:scale-[0.98] font-bold border border-white/20 ${isCollapsed ? 'px-0' : 'px-2.5'}`}
+            style={{
+              background: 'linear-gradient(90deg, #15803d 0%, #16a34a 50%, #dc2626 50%, #b91c1c 100%)'
+            }}
+          >
+            {isCollapsed ? (
+              <div className="flex items-center justify-center space-x-0.5">
+                <ArrowDownLeft size={16} className="text-white drop-shadow-sm" />
+                <ArrowUpRight size={16} className="text-white drop-shadow-sm" />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between w-full px-1">
+                <ArrowDownLeft size={16} className="flex-shrink-0 drop-shadow-sm text-emerald-100" />
+                <span className="text-xs font-black tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] whitespace-nowrap">
+                  Registrar Movimiento
+                </span>
+                <ArrowUpRight size={16} className="flex-shrink-0 drop-shadow-sm text-rose-100" />
+              </div>
+            )}
+          </button>
         </div>
       )}
 

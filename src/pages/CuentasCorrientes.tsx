@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { Transaction } from '../utils/calculations';
 import { calculatePendientes, parseCurrency } from '../utils/calculations';
 import { useListas } from '../lib/api';
-import PaymentModal from '../components/PaymentModal';
+import UnifiedMovementModal from '../components/UnifiedMovementModal';
 // @ts-ignore
 import { Search, PlusCircle, ArrowDownLeft, ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, History, Download } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
@@ -532,13 +532,15 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
         </div>
       </div>
 
-      {/* Partial / Full Payment Modal */}
-      <PaymentModal 
+      {/* Unified Movement Modal (opened in Cta Cte mode) */}
+      <UnifiedMovementModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onRegister={onRegisterPayment}
+        initialMode="CUENTA_CORRIENTE"
+        existingData={data}
+        onRegisterPayment={onRegisterPayment}
         initialEntity={selectedEntityForModal || ''}
-        initialType={modalType}
+        initialPaymentType={modalType}
         pendingBalance={pendientes.find(p => p.entity.toLowerCase() === selectedEntityForModal?.toLowerCase())?.saldo || 0}
         availableEntities={pendientes.map(p => ({ name: p.entity, saldo: p.saldo }))}
       />

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { parseCurrency } from '../utils/calculations';
 import type { Transaction } from '../utils/calculations';
-import TransactionForm from '../components/TransactionForm';
+import UnifiedMovementModal from '../components/UnifiedMovementModal';
 // @ts-ignore
 import { Pencil, Trash2, Search, Filter, ArrowUpDown } from 'lucide-react';
 
@@ -130,11 +130,12 @@ const Transactions: React.FC<TransactionsProps> = ({ data, onAdd, onUpdate, onDe
 
       {/* Modal Dialog for Editing */}
       {showModal && (
-        <TransactionForm 
-          initialData={editingItem}
+        <UnifiedMovementModal 
+          isOpen={showModal}
+          initialTransactionData={editingItem}
           existingData={data}
-          onAdd={onAdd}
-          onUpdate={onUpdate}
+          onAddTransaction={onAdd}
+          onUpdateTransaction={onUpdate}
           onClose={() => {
             setShowModal(false);
             setEditingItem(null);
