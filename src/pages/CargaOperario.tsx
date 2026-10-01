@@ -129,8 +129,8 @@ const CargaOperario: React.FC = () => {
               alt="ZAMPA" 
               className="h-24 w-auto mx-auto mb-2 object-contain opacity-90 mix-blend-multiply" 
             />
-            <h2 className="text-xl font-black text-[#3e3a35] mb-1 uppercase tracking-wide">Quesería</h2>
-            <p className="text-[#6b645c] text-sm mb-6">Ingrese su código de operario</p>
+            <h2 className="text-2xl font-black text-[#3e3a35] mb-1">¡Hola Lucía!</h2>
+            <p className="text-[#6b645c] text-sm mb-6">Ingresá tu PIN para continuar</p>
             
             <form onSubmit={handleLogin} className="space-y-4">
               <input
@@ -170,8 +170,19 @@ const CargaOperario: React.FC = () => {
         </p>
       </header>
 
-      <main className="px-4 pt-6 space-y-6 max-w-md mx-auto">
+      <main className="px-4 pt-6 space-y-5 max-w-md mx-auto">
         
+        {/* Saludo Principal */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#e0d6c8] flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-black text-[#3e3a35]">¡Hola Lucía! 👋</h1>
+            <p className="text-xs text-[#6b645c] font-medium">Registro de producción de hoy</p>
+          </div>
+          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#f4ebd8] text-[#8b7355] border border-[#e0d6c8] uppercase tracking-wider">
+            Planta
+          </span>
+        </div>
+
         {/* Formulario Principal */}
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-5 shadow-sm border border-[#e0d6c8] space-y-5">
           

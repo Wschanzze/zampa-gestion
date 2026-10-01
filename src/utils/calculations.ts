@@ -86,6 +86,8 @@ export type PendingAccount = {
   cobrar: number;
   pagar: number;
   saldo: number;
+  totalFacturadoCredito: number;
+  totalCancelado: number;
   totalIngresos: number;
   totalEgresos: number;
   movimientosCount: number;
@@ -106,14 +108,29 @@ export const isTransactionPending = (row: Transaction): boolean => {
 
 export const calculatePendientes = (data: Transaction[], additionalEntities?: string[]): PendingAccount[] => {
   const map: Record<string, {
-    cobrar: number;
-    pagar: number;
+    ventasCredito: number;
+    cobros: number;
+    comprasCredito: number;
+    pagos: number;
     totalIngresos: number;
     totalEgresos: number;
     movimientosCount: number;
     hasVenta: boolean;
     hasCompra: boolean;
   }> = {};
+
+  // Helper to detect internal technical mirror offset entries
+  const isTechnicalMirror = (row: Transaction) => {
+    const cuenta = (row.Cuenta || '').toUpperCase();
+    const rubro = (row.Rubro || '').toUpperCase();
+    const obs = (row.Observaciones || '').toLowerCase();
+    return cuenta === 'PENDIENTE' && (
+      rubro.includes('COBRO CUENTA CORRIENTE') ||
+      rubro.includes('PAGO PROVEEDOR') ||
+      obs.includes('aplicación de pago') ||
+      obs.includes('aplicacion de pago')
+    );
+  };
 
   // 1. Process all transactions in data so that EVERY entity in Prov/Cliente is included
   data.forEach(row => {
@@ -122,8 +139,10 @@ export const calculatePendientes = (data: Transaction[], additionalEntities?: st
 
     if (!map[rawEntity]) {
       map[rawEntity] = {
-        cobrar: 0,
-        pagar: 0,
+        ventasCredito: 0,
+        cobros: 0,
+        comprasCredito: 0,
+        pagos: 0,
         totalIngresos: 0,
         totalEgresos: 0,
         movimientosCount: 0,
@@ -133,24 +152,47 @@ export const calculatePendientes = (data: Transaction[], additionalEntities?: st
     }
 
     const item = map[rawEntity];
-    item.movimientosCount += 1;
-
+    const cuenta = (row.Cuenta || '').toUpperCase();
+    const rubro = (row.Rubro || '').toUpperCase();
     const ingresos = parseCurrency(row.Ingresos);
     const egresos = parseCurrency(row.Egresos);
+    const isMirror = isTechnicalMirror(row);
+
+    if (!isMirror) {
+      item.movimientosCount += 1;
+    }
+
     item.totalIngresos += ingresos;
     item.totalEgresos += egresos;
 
-    const rubroUpper = (row.Rubro || '').toUpperCase();
-    if (ingresos > 0 || rubroUpper.includes('VENTA')) {
-      item.hasVenta = true;
-    }
-    if (egresos > 0 || rubroUpper.includes('COMPRA') || rubroUpper.includes('GASTO') || rubroUpper.includes('PAGO')) {
+    if (ingresos > 0 || rubro.includes('VENTA')) item.hasVenta = true;
+    if (
+      egresos > 0 || 
+      rubro.includes('COMPRA') || 
+      rubro.includes('GASTO') || 
+      rubro.includes('PAGO') || 
+      rubro.includes('ALIMENTACION') || 
+      rubro.includes('SANIDAD') || 
+      rubro.includes('EQUIPAMIENTO')
+    ) {
       item.hasCompra = true;
     }
 
-    if (isTransactionPending(row)) {
-      item.cobrar += ingresos;
-      item.pagar += egresos;
+    // Direct payment / collection recognition
+    if (rubro.includes('COBRO CUENTA CORRIENTE')) {
+      if (cuenta !== 'PENDIENTE' && ingresos > 0) {
+        item.cobros += ingresos;
+      }
+    } else if (rubro.includes('PAGO PROVEEDOR')) {
+      if (cuenta !== 'PENDIENTE' && egresos > 0) {
+        item.pagos += egresos;
+      }
+    } else {
+      // Normal transaction
+      if (isTransactionPending(row) && !isMirror) {
+        if (ingresos > 0) item.ventasCredito += ingresos;
+        if (egresos > 0) item.comprasCredito += egresos;
+      }
     }
   });
 
@@ -160,8 +202,10 @@ export const calculatePendientes = (data: Transaction[], additionalEntities?: st
       const name = rawName?.trim();
       if (name && !map[name]) {
         map[name] = {
-          cobrar: 0,
-          pagar: 0,
+          ventasCredito: 0,
+          cobros: 0,
+          comprasCredito: 0,
+          pagos: 0,
           totalIngresos: 0,
           totalEgresos: 0,
           movimientosCount: 0,
@@ -174,8 +218,9 @@ export const calculatePendientes = (data: Transaction[], additionalEntities?: st
 
   // 3. Format and sort
   const results: PendingAccount[] = Object.entries(map).map(([name, vals]) => {
-    const saldo = parseFloat((vals.cobrar - vals.pagar).toFixed(2));
-    
+    const saldoCliente = vals.ventasCredito - vals.cobros;
+    const saldoProveedor = vals.comprasCredito - vals.pagos;
+
     let tipo: 'CLIENTE' | 'PROVEEDOR' | 'AMBOS' = 'CLIENTE';
     if (vals.hasVenta && vals.hasCompra) {
       tipo = 'AMBOS';
@@ -185,11 +230,41 @@ export const calculatePendientes = (data: Transaction[], additionalEntities?: st
       tipo = 'CLIENTE';
     }
 
+    let saldo = 0;
+    let cobrar = 0;
+    let pagar = 0;
+    let totalFacturadoCredito = 0;
+    let totalCancelado = 0;
+
+    if (tipo === 'CLIENTE') {
+      saldo = parseFloat(saldoCliente.toFixed(2));
+      cobrar = saldo > 0 ? saldo : 0;
+      pagar = saldo < 0 ? Math.abs(saldo) : 0;
+      totalFacturadoCredito = parseFloat(vals.ventasCredito.toFixed(2));
+      totalCancelado = parseFloat(vals.cobros.toFixed(2));
+    } else if (tipo === 'PROVEEDOR') {
+      saldo = parseFloat((-saldoProveedor).toFixed(2));
+      pagar = saldoProveedor > 0 ? parseFloat(saldoProveedor.toFixed(2)) : 0;
+      cobrar = saldoProveedor < 0 ? parseFloat(Math.abs(saldoProveedor).toFixed(2)) : 0;
+      totalFacturadoCredito = parseFloat(vals.comprasCredito.toFixed(2));
+      totalCancelado = parseFloat(vals.pagos.toFixed(2));
+    } else {
+      saldo = parseFloat((saldoCliente - saldoProveedor).toFixed(2));
+      cobrar = saldo > 0 ? saldo : 0;
+      pagar = saldo < 0 ? Math.abs(saldo) : 0;
+      totalFacturadoCredito = parseFloat((vals.ventasCredito + vals.comprasCredito).toFixed(2));
+      totalCancelado = parseFloat((vals.cobros + vals.pagos).toFixed(2));
+    }
+
+    if (Object.is(saldo, -0)) saldo = 0;
+
     return {
       entity: name,
-      cobrar: parseFloat(vals.cobrar.toFixed(2)),
-      pagar: parseFloat(vals.pagar.toFixed(2)),
+      cobrar,
+      pagar,
       saldo,
+      totalFacturadoCredito,
+      totalCancelado,
       totalIngresos: parseFloat(vals.totalIngresos.toFixed(2)),
       totalEgresos: parseFloat(vals.totalEgresos.toFixed(2)),
       movimientosCount: vals.movimientosCount,
@@ -197,15 +272,135 @@ export const calculatePendientes = (data: Transaction[], additionalEntities?: st
     };
   });
 
-  // Sort: active pending balances first (by magnitude), then zero balance alphabetically
+  // Sort: active pending balances first (by magnitude), then entities with activity, then zero balance alphabetically
   return results.sort((a, b) => {
     const absA = Math.abs(a.saldo);
     const absB = Math.abs(b.saldo);
-    if (absA > 0 || absB > 0) {
+    if (absA !== absB) {
       return absB - absA;
+    }
+    const actA = a.totalFacturadoCredito + a.totalCancelado;
+    const actB = b.totalFacturadoCredito + b.totalCancelado;
+    if (actA !== actB) {
+      return actB - actA;
     }
     return a.entity.localeCompare(b.entity, 'es', { sensitivity: 'base' });
   });
+};
+
+export type StatementLine = {
+  id: string;
+  fecha: string;
+  concepto: string;
+  subrubro?: string;
+  cuenta?: string;
+  observaciones?: string;
+  cargo: number;
+  abono: number;
+  saldo: number;
+  esContado?: boolean;
+};
+
+// Robust date parser for es-AR "D/M/YYYY" or ISO formats
+export const parseFechaToTime = (fechaStr?: string): number => {
+  if (!fechaStr) return 0;
+  if (fechaStr.includes('/')) {
+    const parts = fechaStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10) || 0;
+      const month = (parseInt(parts[1], 10) || 1) - 1;
+      const year = parseInt(parts[2], 10) || 0;
+      return new Date(year, month, day).getTime();
+    }
+  }
+  const t = new Date(fechaStr).getTime();
+  return isNaN(t) ? 0 : t;
+};
+
+export const buildEntityStatement = (
+  entityName: string,
+  entityTipo: 'CLIENTE' | 'PROVEEDOR' | 'AMBOS',
+  allTransactions: Transaction[]
+): StatementLine[] => {
+  const isCliente = entityTipo === 'CLIENTE' || entityTipo === 'AMBOS';
+
+  // 1. Filtrar transacciones de esta entidad excluyendo asientos técnicos espejo
+  const rows = allTransactions
+    .filter(d => d['Prov/Cliente']?.toLowerCase().trim() === entityName.toLowerCase().trim())
+    .filter(r => {
+      const cuenta = (r.Cuenta || '').toUpperCase();
+      const rubro = (r.Rubro || '').toUpperCase();
+      const obs = (r.Observaciones || '').toLowerCase();
+      const isMirror = cuenta === 'PENDIENTE' && (
+        rubro.includes('COBRO CUENTA CORRIENTE') ||
+        rubro.includes('PAGO PROVEEDOR') ||
+        obs.includes('aplicación de pago') ||
+        obs.includes('aplicacion de pago')
+      );
+      return !isMirror;
+    })
+    .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
+
+  let runningSaldo = 0;
+  const lines: StatementLine[] = [];
+
+  rows.forEach((r, idx) => {
+    const ing = parseCurrency(r.Ingresos);
+    const eg = parseCurrency(r.Egresos);
+    const rubro = (r.Rubro || '').toUpperCase();
+
+    let cargo = 0;
+    let abono = 0;
+    let concepto = r.Rubro || 'Movimiento';
+    let esContado = false;
+
+    if (isCliente) {
+      if (rubro.includes('COBRO CUENTA CORRIENTE')) {
+        abono = ing > 0 ? ing : eg;
+        runningSaldo -= abono;
+        concepto = 'Cobro recibido / Pago a cuenta';
+      } else if (isTransactionPending(r)) {
+        cargo = ing > 0 ? ing : eg;
+        runningSaldo += cargo;
+        concepto = r.Rubro ? `${r.Rubro} (A Crédito)` : 'Venta a Crédito';
+      } else {
+        esContado = true;
+        cargo = 0;
+        abono = 0;
+        concepto = r.Rubro ? `${r.Rubro} (Contado)` : 'Venta de Contado';
+      }
+    } else {
+      if (rubro.includes('PAGO PROVEEDOR')) {
+        abono = eg > 0 ? eg : ing;
+        runningSaldo -= abono;
+        concepto = 'Pago emitido a proveedor';
+      } else if (isTransactionPending(r)) {
+        cargo = eg > 0 ? eg : ing;
+        runningSaldo += cargo;
+        concepto = r.Rubro ? `${r.Rubro} (A Crédito)` : 'Factura / Compra a Crédito';
+      } else {
+        esContado = true;
+        cargo = 0;
+        abono = 0;
+        concepto = r.Rubro ? `${r.Rubro} (Contado)` : 'Gasto de Contado';
+      }
+    }
+
+    lines.push({
+      id: r.id || `${r.Fecha}-${idx}`,
+      fecha: r.Fecha,
+      concepto,
+      subrubro: r['Subrubro/Producto'] || undefined,
+      cuenta: r.Cuenta,
+      observaciones: r.Observaciones,
+      cargo,
+      abono,
+      saldo: parseFloat(runningSaldo.toFixed(2)),
+      esContado,
+    });
+  });
+
+  return lines;
 };
 
 export const getAvailableYears = (data: Transaction[]) => {

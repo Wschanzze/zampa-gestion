@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import type { Transaction } from '../utils/calculations';
-import { calculatePendientes, parseCurrency } from '../utils/calculations';
+import { calculatePendientes, buildEntityStatement } from '../utils/calculations';
 import { useListas } from '../lib/api';
 import UnifiedMovementModal from '../components/UnifiedMovementModal';
 // @ts-ignore
-import { Search, PlusCircle, ArrowDownLeft, ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, History, Download } from 'lucide-react';
+import { Search, ArrowDownLeft, ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, History, Download, Check, FileText } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 
 interface CuentasCorrientesProps {
@@ -20,27 +20,12 @@ interface CuentasCorrientesProps {
   }) => Promise<boolean | void>;
 }
 
-// Robust date parser for es-AR "D/M/YYYY" or ISO formats
-const parseFechaToTime = (fechaStr?: string): number => {
-  if (!fechaStr) return 0;
-  if (fechaStr.includes('/')) {
-    const parts = fechaStr.split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10) || 0;
-      const month = (parseInt(parts[1], 10) || 1) - 1;
-      const year = parseInt(parts[2], 10) || 0;
-      return new Date(year, month, day).getTime();
-    }
-  }
-  const t = new Date(fechaStr).getTime();
-  return isNaN(t) ? 0 : t;
-};
-
 const formatCurrency = (val: number) => {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
     minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(val);
 };
 
@@ -105,99 +90,104 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
     setIsModalOpen(true);
   };
 
-  // Get transactions history for expanded entity
-  const entityHistory = useMemo(() => {
-    if (!expandedEntity) return [];
-    return data.filter(d => d['Prov/Cliente']?.toLowerCase().trim() === expandedEntity.toLowerCase().trim())
-      .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
-  }, [data, expandedEntity]);
-
-  const handleExportPDF = (entityName: string, entitySaldo: number) => {
-    // 1. Get history for this entity
-    const history = data.filter(d => d['Prov/Cliente']?.toLowerCase().trim() === entityName.toLowerCase().trim())
-      .sort((a, b) => parseFechaToTime(a.Fecha) - parseFechaToTime(b.Fecha));
+  const handleExportPDF = (entityName: string, entitySaldo: number, entityTipo: 'CLIENTE' | 'PROVEEDOR' | 'AMBOS') => {
+    // 1. Get clean progressive statement for this entity
+    const statement = buildEntityStatement(entityName, entityTipo, data);
 
     // 2. Create a temporary div element for PDF generation
     const container = document.createElement('div');
     container.innerHTML = `
-      <div style="padding: 50px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; position: relative; min-height: 100vh; background-color: #ffffff; color: #333;">
+      <div style="padding: 40px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; position: relative; min-height: 100vh; background-color: #ffffff; color: #333;">
         <!-- Watermark -->
         <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('/ovejas_render.png'); background-position: center; background-repeat: no-repeat; background-size: 80%; opacity: 0.05; pointer-events: none; z-index: 0;"></div>
         
         <div style="position: relative; z-index: 1;">
           <!-- Header -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 3px solid #8b7355; padding-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 3px solid #8b7355; padding-bottom: 18px;">
             <div>
-              <img src="/logo negro.png" alt="ZAMPA" style="height: 60px; margin-bottom: 10px;" onerror="this.style.display='none'" />
+              <img src="/logo negro.png" alt="ZAMPA" style="height: 52px; margin-bottom: 8px;" onerror="this.style.display='none'" />
               <p style="font-size: 11px; color: #666; margin: 0; font-weight: bold; letter-spacing: 1px;">QUESERÍA ARTESANAL ZAMPA</p>
+              <p style="font-size: 10px; color: #999; margin: 2px 0 0 0;">Gestión Administrativa y Financiera</p>
             </div>
             <div style="text-align: right;">
-              <h1 style="font-size: 26px; color: #8b7355; margin: 0 0 8px 0; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase;">
-                ${entitySaldo > 0 ? 'COMPROBANTE A PAGAR' : entitySaldo < 0 ? 'ESTADO DE CUENTA (A FAVOR)' : 'ESTADO DE CUENTA'}
+              <h1 style="font-size: 22px; color: #8b7355; margin: 0 0 6px 0; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase;">
+                ESTADO DE CUENTA CORRIENTE
               </h1>
-              <p style="font-size: 14px; color: #444; margin: 0;"><strong>CLIENTE/PROV:</strong> ${entityName.toUpperCase()}</p>
-              <p style="font-size: 12px; color: #888; margin: 5px 0 0 0;">Fecha Emisión: ${new Date().toLocaleDateString('es-AR')}</p>
+              <p style="font-size: 13px; color: #444; margin: 0;"><strong>${entityTipo === 'PROVEEDOR' ? 'PROVEEDOR:' : 'CLIENTE:'}</strong> ${entityName.toUpperCase()}</p>
+              <p style="font-size: 11px; color: #888; margin: 4px 0 0 0;">Fecha Emisión: ${new Date().toLocaleDateString('es-AR')}</p>
             </div>
           </div>
 
-          <!-- Outstanding Balance Huge Block -->
-          <div style="background-color: ${entitySaldo > 0 ? '#f0fdf4' : entitySaldo < 0 ? '#fff1f2' : '#f9fafb'}; border: 1px solid ${entitySaldo > 0 ? '#bbf7d0' : entitySaldo < 0 ? '#fecdd3' : '#e5e7eb'}; padding: 25px 30px; border-radius: 12px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+          <!-- Outstanding Balance Highlight Block -->
+          <div style="background-color: ${entitySaldo > 0 ? '#f0fdf4' : entitySaldo < 0 ? '#fff1f2' : '#f9fafb'}; border: 1px solid ${entitySaldo > 0 ? '#bbf7d0' : entitySaldo < 0 ? '#fecdd3' : '#e5e7eb'}; padding: 20px 25px; border-radius: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <p style="font-size: 13px; font-weight: 700; color: #666; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">
-                ${entitySaldo > 0 ? 'TOTAL A PAGAR (Saldo Pendiente)' : entitySaldo < 0 ? 'SALDO A FAVOR SUYO' : 'Cuenta Saldada ($0)'}
+              <p style="font-size: 12px; font-weight: 700; color: #666; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">
+                ${entitySaldo > 0 ? 'SALDO PENDIENTE A COBRAR (A NUESTRO FAVOR)' : entitySaldo < 0 ? 'SALDO PENDIENTE A PAGAR (A PROVEEDOR)' : 'CUENTA SALDADA / AL DÍA'}
               </p>
-              <p style="font-size: 12px; color: #888; margin: 0;">${entitySaldo > 0 ? 'Por favor, regularice su saldo pendiente a la brevedad.' : 'Sus pagos han superado o cubierto los cargos.'}</p>
+              <p style="font-size: 11px; color: #888; margin: 0;">
+                ${entitySaldo > 0 ? 'Monto adeudado a la fecha.' : entitySaldo < 0 ? 'Monto adeudado al proveedor a la fecha.' : 'No registra deudas pendientes.'}
+              </p>
             </div>
             <div style="text-align: right;">
-              <span style="font-size: 32px; font-weight: 900; color: ${entitySaldo > 0 ? '#059669' : entitySaldo < 0 ? '#e11d48' : '#374151'};">
-                ${formatCurrency(Math.abs(entitySaldo))}
+              <span style="font-size: 28px; font-weight: 900; color: ${entitySaldo > 0 ? '#059669' : entitySaldo < 0 ? '#e11d48' : '#374151'};">
+                ${entitySaldo === 0 ? '$0' : formatCurrency(Math.abs(entitySaldo))}
               </span>
             </div>
           </div>
 
-          <!-- Table of Details -->
-          <h3 style="font-size: 14px; color: #333; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px;">DETALLE DE MOVIMIENTOS</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; margin-bottom: 30px;">
+          <!-- Table of Progressive Statement -->
+          <h3 style="font-size: 13px; color: #333; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 6px; font-weight: bold;">EXTRACTO CRONOLÓGICO DE MOVIMIENTOS</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; margin-bottom: 25px;">
             <thead>
               <tr style="background-color: #fafafa; border-bottom: 2px solid #ddd;">
-                <th style="padding: 12px 8px; font-weight: 700; color: #555;">FECHA</th>
-                <th style="padding: 12px 8px; font-weight: 700; color: #555;">DETALLE / CONCEPTO</th>
-                <th style="padding: 12px 8px; font-weight: 700; color: #555; text-align: right;">CARGOS ($)</th>
-                <th style="padding: 12px 8px; font-weight: 700; color: #555; text-align: right;">PAGOS / ABONOS ($)</th>
+                <th style="padding: 10px 6px; font-weight: 700; color: #555;">FECHA</th>
+                <th style="padding: 10px 6px; font-weight: 700; color: #555;">CONCEPTO</th>
+                <th style="padding: 10px 6px; font-weight: 700; color: #555;">MEDIO</th>
+                <th style="padding: 10px 6px; font-weight: 700; color: #555; text-align: right;">CARGOS (+)</th>
+                <th style="padding: 10px 6px; font-weight: 700; color: #555; text-align: right;">PAGOS (-)</th>
+                <th style="padding: 10px 6px; font-weight: 700; color: #555; text-align: right;">SALDO RESULTANTE</th>
               </tr>
             </thead>
             <tbody>
-              ${history.map((h) => {
-                 const cargo = parseCurrency(h.Ingresos);
-                 const pago = parseCurrency(h.Egresos);
-                 return `
+              ${statement.length === 0 ? `
+                <tr><td colspan="6" style="padding: 20px; text-align: center; color: #888;">No se registran movimientos.</td></tr>
+              ` : statement.map(s => `
                 <tr style="border-bottom: 1px solid #f0f0f0;">
-                  <td style="padding: 12px 8px; color: #555; white-space: nowrap;">${h.Fecha || '-'}</td>
-                  <td style="padding: 12px 8px; color: #333;">
-                    <strong>${h.Rubro || ''}</strong> ${h['Subrubro/Producto'] ? ` - ${h['Subrubro/Producto']}` : ''}
-                    ${h.Observaciones ? `<br><span style="color: #888; font-size: 11px;">${h.Observaciones}</span>` : ''}
+                  <td style="padding: 9px 6px; color: #555; white-space: nowrap;">${s.fecha || '-'}</td>
+                  <td style="padding: 9px 6px; color: #333;">
+                    <strong>${s.concepto}</strong>
+                    ${s.subrubro ? ` - <span style="color: #666;">${s.subrubro}</span>` : ''}
+                    ${s.esContado ? ` <span style="font-size: 9px; padding: 2px 4px; background: #eee; border-radius: 3px; color: #666;">(Contado)</span>` : ''}
+                    ${s.observaciones ? `<br><span style="color: #888; font-size: 10px;">${s.observaciones}</span>` : ''}
                   </td>
-                  <td style="padding: 12px 8px; text-align: right; color: #333;">${cargo > 0 ? formatCurrency(cargo) : '-'}</td>
-                  <td style="padding: 12px 8px; text-align: right; color: #333;">${pago > 0 ? formatCurrency(pago) : '-'}</td>
+                  <td style="padding: 9px 6px; color: #666;">${s.cuenta || '-'}</td>
+                  <td style="padding: 9px 6px; text-align: right; color: #333; font-weight: 600;">${s.cargo > 0 ? formatCurrency(s.cargo) : '-'}</td>
+                  <td style="padding: 9px 6px; text-align: right; color: #059669; font-weight: 600;">${s.abono > 0 ? formatCurrency(s.abono) : '-'}</td>
+                  <td style="padding: 9px 6px; text-align: right; font-weight: bold; color: ${s.saldo > 0 ? '#059669' : s.saldo < 0 ? '#e11d48' : '#666'};">
+                    ${s.saldo === 0 ? '$0' : formatCurrency(Math.abs(s.saldo))}
+                  </td>
                 </tr>
-              `}).join('')}
+              `).join('')}
             </tbody>
             <tfoot>
               <tr style="background-color: #fafafa; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
-                <td colspan="2" style="padding: 12px 8px; font-weight: bold; text-align: right; color: #555;">SUMA TOTAL:</td>
-                <td style="padding: 12px 8px; font-weight: bold; text-align: right; color: #333;">
-                  ${formatCurrency(history.reduce((acc, h) => acc + parseCurrency(h.Ingresos), 0))}
+                <td colspan="3" style="padding: 10px 6px; font-weight: bold; text-align: right; color: #555;">TOTALES:</td>
+                <td style="padding: 10px 6px; font-weight: bold; text-align: right; color: #333;">
+                  ${formatCurrency(statement.reduce((acc, s) => acc + s.cargo, 0))}
                 </td>
-                <td style="padding: 12px 8px; font-weight: bold; text-align: right; color: #333;">
-                  ${formatCurrency(history.reduce((acc, h) => acc + parseCurrency(h.Egresos), 0))}
+                <td style="padding: 10px 6px; font-weight: bold; text-align: right; color: #059669;">
+                  ${formatCurrency(statement.reduce((acc, s) => acc + s.abono, 0))}
+                </td>
+                <td style="padding: 10px 6px; font-weight: 900; text-align: right; color: ${entitySaldo > 0 ? '#059669' : entitySaldo < 0 ? '#e11d48' : '#333'};">
+                  ${entitySaldo === 0 ? '$0' : formatCurrency(Math.abs(entitySaldo))}
                 </td>
               </tr>
             </tfoot>
           </table>
           
-          <div style="margin-top: 60px; text-align: center; color: #999; font-size: 11px; border-top: 1px solid #eee; padding-top: 20px;">
-            <p style="margin: 0 0 5px 0;"><strong>DOCUMENTO INTERNO / NO VÁLIDO COMO FACTURA LEGAL</strong></p>
-            <p style="margin: 0;">Quesería Artesanal Zampa - Comprobante generado automáticamente.</p>
+          <div style="margin-top: 40px; text-align: center; color: #999; font-size: 10px; border-top: 1px solid #eee; padding-top: 15px;">
+            <p style="margin: 0 0 4px 0;"><strong>DOCUMENTO INTERNO / NO VÁLIDO COMO FACTURA LEGAL</strong></p>
+            <p style="margin: 0;">Quesería Artesanal Zampa - Extracto emitido automáticamente por el sistema de gestión.</p>
           </div>
         </div>
       </div>
@@ -206,7 +196,7 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
     // 3. Generate PDF
     const opt: any = {
       margin: 0,
-      filename: `Estado_Cuenta_${entityName.replace(/\\s+/g, '_')}.pdf`,
+      filename: `Estado_Cuenta_${entityName.replace(/\s+/g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
@@ -264,7 +254,7 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
             </div>
             <p className="text-2xl font-black text-rose-700 mt-1">{formatCurrency(totalAPagar)}</p>
             <span className="text-[11px] text-[#6b645c]">
-              {pendientes.filter(p => p.saldo < 0).length} proveedores con facturas pendientes
+              {pendientes.filter(p => p.saldo < 0).length} proveedores con saldo pendiente
             </span>
           </div>
         </div>
@@ -343,10 +333,10 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
             <thead className="text-xs text-[#6b645c] uppercase bg-[#f4ebd8] border-b border-[#e0d6c8] sticky top-0 z-30 shadow-sm">
               <tr>
                 <th className="px-4 py-3">Cliente / Proveedor</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3 text-right text-emerald-800">Nos deben (a cobrar)</th>
-                <th className="px-4 py-3 text-right text-rose-800">Debemos (a pagar)</th>
-                <th className="px-4 py-3 text-right font-bold">Saldo Pendiente</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3 text-right">Total a Crédito</th>
+                <th className="px-4 py-3 text-right text-emerald-800">Cancelado / Pagado</th>
+                <th className="px-4 py-3 text-right font-bold text-[#3e3a35]">Saldo Pendiente</th>
                 <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
             </thead>
@@ -361,82 +351,118 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                   <React.Fragment key={row.entity}>
                     <tr className={`border-b border-[#e0d6c8]/40 hover:bg-[#f4ebd8]/30 transition-colors ${isExpanded ? 'bg-[#faf7f2]' : ''}`}>
                       
-                      {/* Name */}
+                      {/* Name & Role */}
                       <td className="px-4 py-3.5 font-bold text-[#3e3a35]">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2.5">
                           <button
                             onClick={() => setExpandedEntity(isExpanded ? null : row.entity)}
                             className="p-1 text-[#6b645c] hover:text-[#3e3a35] hover:bg-[#e0d6c8]/50 rounded transition-colors"
-                            title="Ver detalle de movimientos"
+                            title="Ver extracto de cuenta corriente"
                           >
-                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                           </button>
-                          <span>{row.entity}</span>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-[#2d2a26]">{row.entity}</span>
+                            <span className="text-[10px] text-[#8c827a] font-normal">
+                              {row.tipo === 'AMBOS' ? 'Cliente / Proveedor' : row.tipo === 'CLIENTE' ? 'Cliente' : 'Proveedor'}
+                            </span>
+                          </div>
                         </div>
                       </td>
 
-                      {/* Type badge */}
-                      <td className="px-4 py-3.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                      {/* State badge */}
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
                           isCliente 
                             ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                             : isProveedor 
                             ? 'bg-rose-50 text-rose-800 border-rose-200' 
-                            : row.tipo === 'CLIENTE'
-                            ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200'
-                            : row.tipo === 'PROVEEDOR'
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
                             : 'bg-gray-100 text-gray-700 border-gray-200'
                         }`}>
-                          {isCliente 
-                            ? 'CLIENTE (A COBRAR)' 
-                            : isProveedor 
-                            ? 'PROVEEDOR (A PAGAR)' 
-                            : row.tipo === 'CLIENTE'
-                            ? 'CLIENTE • AL DÍA'
-                            : row.tipo === 'PROVEEDOR'
-                            ? 'PROVEEDOR • AL DÍA'
-                            : 'AL DÍA'}
+                          {isCliente ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                              <span>A COBRAR</span>
+                            </>
+                          ) : isProveedor ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                              <span>A PAGAR</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check size={12} className="text-emerald-600" />
+                              <span>AL DÍA ($0)</span>
+                            </>
+                          )}
                         </span>
                       </td>
 
-                      {/* A cobrar */}
+                      {/* Total Facturado / a Crédito */}
+                      <td className="px-4 py-3.5 text-right font-mono text-[#3e3a35] font-semibold">
+                        {row.totalFacturadoCredito > 0 ? (
+                          <div>
+                            <span>{formatCurrency(row.totalFacturadoCredito)}</span>
+                            <div className="text-[10px] text-[#8c827a] font-sans font-normal">
+                              {isCliente ? 'ventas crédito' : isProveedor ? 'facturas crédito' : 'operado'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 font-normal">-</span>
+                        )}
+                      </td>
+
+                      {/* Total Cancelado / Pagado */}
                       <td className="px-4 py-3.5 text-right font-mono text-emerald-700 font-semibold">
-                        {row.cobrar > 0 ? formatCurrency(row.cobrar) : '-'}
+                        {row.totalCancelado > 0 ? (
+                          <div>
+                            <span>{formatCurrency(row.totalCancelado)}</span>
+                            <div className="text-[10px] text-emerald-600/80 font-sans font-normal">
+                              {isCliente ? 'cobrado' : isProveedor ? 'pagado' : 'cancelado'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 font-normal">-</span>
+                        )}
                       </td>
 
-                      {/* A pagar */}
-                      <td className="px-4 py-3.5 text-right font-mono text-rose-700 font-semibold">
-                        {row.pagar > 0 ? formatCurrency(row.pagar) : '-'}
-                      </td>
-
-                      {/* Saldo */}
-                      <td className="px-4 py-3.5 text-right font-mono font-bold text-sm">
-                        <span className={isCliente ? 'text-emerald-700' : isProveedor ? 'text-rose-700' : 'text-[#6b645c]'}>
-                          {isCliente && '+ '}
-                          {isProveedor && '- '}
-                          {row.saldo === 0 ? '$0' : formatCurrency(Math.abs(row.saldo))}
-                        </span>
+                      {/* Saldo Pendiente */}
+                      <td className="px-4 py-3.5 text-right font-mono font-bold whitespace-nowrap">
+                        {row.saldo === 0 ? (
+                          <div className="flex items-center justify-end gap-1 text-gray-500 font-bold text-sm">
+                            <Check size={14} className="text-emerald-600" /> $0
+                          </div>
+                        ) : (
+                          <div>
+                            <span className={`text-base font-black ${isCliente ? 'text-emerald-700' : 'text-rose-700'}`}>
+                              {isCliente ? '+ ' : '- '}
+                              {formatCurrency(Math.abs(row.saldo))}
+                            </span>
+                            <div className={`text-[10px] font-sans font-semibold uppercase tracking-wider ${isCliente ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {isCliente ? 'Falta cobrar' : 'Falta pagar'}
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* Actions */}
                       <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center space-x-2">
+                        <div className="flex items-center justify-center space-x-1.5 sm:space-x-2">
                           {!isSaldado ? (
                             <button
                               onClick={() => handleOpenPayment(row.entity, isCliente)}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1 ${
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1 ${
                                 isCliente 
                                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
                                   : 'bg-rose-600 hover:bg-rose-700 text-white'
                               }`}
                             >
-                              <span>{isCliente ? 'Cobrar Deuda' : 'Pagar Deuda'}</span>
+                              <span>{isCliente ? 'Cobrar' : 'Pagar'}</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => handleOpenPayment(row.entity, row.tipo !== 'PROVEEDOR')}
-                              className="px-2.5 py-1 text-xs border border-[#e0d6c8] text-[#5c544d] hover:bg-[#f4ebd8] rounded-lg font-semibold transition-colors flex items-center space-x-1 bg-white"
+                              className="px-2.5 py-1.5 text-xs border border-[#e0d6c8] text-[#5c544d] hover:bg-[#f4ebd8] rounded-lg font-semibold transition-colors flex items-center space-x-1 bg-white"
                               title="Registrar cobro o pago"
                             >
                               <span>Cobro / Pago</span>
@@ -444,15 +470,18 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
                           )}
                           <button
                             onClick={() => setExpandedEntity(isExpanded ? null : row.entity)}
-                            className="px-2.5 py-1 text-xs border border-[#e0d6c8] text-[#6b645c] hover:bg-[#f4ebd8] rounded-lg font-semibold transition-colors flex items-center space-x-1"
+                            className={`px-2.5 py-1.5 text-xs border rounded-lg font-semibold transition-colors flex items-center space-x-1 ${
+                              isExpanded ? 'bg-[#8b7355] text-white border-[#8b7355]' : 'border-[#e0d6c8] text-[#6b645c] hover:bg-[#f4ebd8] bg-white'
+                            }`}
+                            title="Ver extracto de cuenta corriente"
                           >
                             <History size={13} />
-                            <span>Historial</span>
+                            <span>Extracto</span>
                           </button>
                           <button
-                            onClick={() => handleExportPDF(row.entity, row.saldo)}
-                            className="px-2.5 py-1 text-xs border border-[#e0d6c8] text-[#8b7355] hover:bg-[#f4ebd8] rounded-lg font-semibold transition-colors flex items-center space-x-1"
-                            title="Exportar a PDF"
+                            onClick={() => handleExportPDF(row.entity, row.saldo, row.tipo)}
+                            className="px-2.5 py-1.5 text-xs border border-[#e0d6c8] text-[#8b7355] hover:bg-[#f4ebd8] rounded-lg font-semibold transition-colors flex items-center space-x-1 bg-white"
+                            title="Descargar extracto en PDF"
                           >
                             <Download size={13} />
                             <span>PDF</span>
@@ -462,56 +491,143 @@ const CuentasCorrientes: React.FC<CuentasCorrientesProps> = ({ data, onRegisterP
 
                     </tr>
 
-                    {/* Expanded History Drawer */}
+                    {/* Expanded Extract Drawer */}
                     {isExpanded && (
                       <tr className="bg-[#fcfbf9] border-b border-[#e0d6c8]">
-                        <td colSpan={6} className="p-4 sm:p-6 space-y-3">
-                          <div className="flex items-center justify-between border-b border-[#e0d6c8]/60 pb-2">
-                            <h4 className="text-xs font-bold text-[#3e3a35] uppercase tracking-wider flex items-center space-x-1.5">
-                              <History size={14} className="text-[#8b7355]" />
-                              <span>Historial de Movimientos de Cuenta Corriente: {row.entity}</span>
-                            </h4>
-                            <span className="text-xs text-[#6b645c]">
-                              {entityHistory.length} movimientos registrados
-                            </span>
+                        <td colSpan={6} className="p-4 sm:p-6 space-y-4">
+                          
+                          {/* Drawer Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e0d6c8]/60 pb-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-[#3e3a35] flex items-center space-x-2">
+                                <History size={16} className="text-[#8b7355]" />
+                                <span>Extracto de Cuenta Corriente: {row.entity}</span>
+                              </h4>
+                              <p className="text-xs text-[#6b645c] mt-0.5">
+                                Evolución cronológica de facturación a crédito, pagos realizados y saldo progresivo
+                              </p>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleExportPDF(row.entity, row.saldo, row.tipo)}
+                                className="px-3 py-1.5 text-xs bg-white border border-[#e0d6c8] text-[#8b7355] hover:bg-[#f4ebd8] rounded-lg font-bold transition-colors flex items-center space-x-1.5 shadow-2xs"
+                              >
+                                <Download size={13} />
+                                <span>Descargar Extracto PDF</span>
+                              </button>
+                              {!isSaldado && (
+                                <button
+                                  onClick={() => handleOpenPayment(row.entity, isCliente)}
+                                  className={`px-3 py-1.5 text-xs text-white rounded-lg font-bold transition-all shadow-2xs flex items-center space-x-1.5 ${
+                                    isCliente ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                                  }`}
+                                >
+                                  <span>{isCliente ? 'Registrar Cobro' : 'Registrar Pago'}</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="overflow-x-auto bg-white rounded-lg border border-[#e0d6c8]/60">
-                            <table className="w-full text-xs text-left">
-                              <thead className="bg-[#f4ebd8]/40 border-b border-[#e0d6c8]/60 text-[#6b645c]">
-                                <tr>
-                                  <th className="px-3 py-2">Fecha</th>
-                                  <th className="px-3 py-2">Cuenta</th>
-                                  <th className="px-3 py-2">Rubro / Concepto</th>
-                                  <th className="px-3 py-2 text-right">Ingreso ($)</th>
-                                  <th className="px-3 py-2 text-right">Egreso ($)</th>
-                                  <th className="px-3 py-2">Observaciones</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {entityHistory.map((h, i) => (
-                                  <tr key={h.id || i} className="border-b border-gray-100 hover:bg-[#faf7f2]">
-                                    <td className="px-3 py-2 font-medium">{h.Fecha}</td>
-                                    <td className="px-3 py-2">
-                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                        h.Cuenta?.toUpperCase() === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                                      }`}>
-                                        {h.Cuenta}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2 text-[#3e3a35] font-medium">{h.Rubro} {h['Subrubro/Producto'] ? `(${h['Subrubro/Producto']})` : ''}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-emerald-700 font-medium">
-                                      {parseCurrency(h.Ingresos) > 0 ? formatCurrency(parseCurrency(h.Ingresos)) : '-'}
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-mono text-rose-700 font-medium">
-                                      {parseCurrency(h.Egresos) > 0 ? formatCurrency(parseCurrency(h.Egresos)) : '-'}
-                                    </td>
-                                    <td className="px-3 py-2 text-[#6b645c] max-w-[250px] truncate" title={h.Observaciones}>{h.Observaciones || '-'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                          {/* Mini Summary Cards */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="bg-white p-3 rounded-lg border border-[#e0d6c8]/80 shadow-2xs">
+                              <span className="text-[11px] font-bold text-[#6b645c] uppercase">Total Operado a Crédito</span>
+                              <p className="text-base font-bold text-[#3e3a35] mt-0.5">{formatCurrency(row.totalFacturadoCredito)}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg border border-[#e0d6c8]/80 shadow-2xs">
+                              <span className="text-[11px] font-bold text-[#6b645c] uppercase">Total Cancelado / Pagado</span>
+                              <p className="text-base font-bold text-emerald-700 mt-0.5">{formatCurrency(row.totalCancelado)}</p>
+                            </div>
+                            <div className={`p-3 rounded-lg border shadow-2xs ${
+                              row.saldo > 0 ? 'bg-emerald-50/70 border-emerald-200' : row.saldo < 0 ? 'bg-rose-50/70 border-rose-200' : 'bg-[#faf9f6] border-[#e0d6c8]/80'
+                            }`}>
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-[#6b645c]">
+                                {row.saldo > 0 ? 'Saldo Pendiente (A Cobrar)' : row.saldo < 0 ? 'Saldo Pendiente (A Pagar)' : 'Saldo Actual'}
+                              </span>
+                              <p className={`text-base font-black mt-0.5 ${
+                                row.saldo > 0 ? 'text-emerald-700' : row.saldo < 0 ? 'text-rose-700' : 'text-gray-600'
+                              }`}>
+                                {row.saldo === 0 ? '$0 (Al Día)' : formatCurrency(Math.abs(row.saldo))}
+                              </p>
+                            </div>
                           </div>
+
+                          {/* Statement Table */}
+                          {(() => {
+                            const statement = buildEntityStatement(row.entity, row.tipo, data);
+                            if (statement.length === 0) {
+                              return (
+                                <div className="p-6 text-center text-[#6b645c] bg-white rounded-lg border border-[#e0d6c8]/60">
+                                  No hay movimientos registrados para esta cuenta.
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="overflow-x-auto bg-white rounded-xl border border-[#e0d6c8] shadow-2xs">
+                                <table className="w-full text-xs text-left">
+                                  <thead className="bg-[#f4ebd8]/60 border-b border-[#e0d6c8] text-[#6b645c] uppercase text-[11px] font-bold">
+                                    <tr>
+                                      <th className="px-3.5 py-2.5">Fecha</th>
+                                      <th className="px-3.5 py-2.5">Concepto / Operación</th>
+                                      <th className="px-3.5 py-2.5">Medio</th>
+                                      <th className="px-3.5 py-2.5 text-right text-emerald-900">Cargos (+)</th>
+                                      <th className="px-3.5 py-2.5 text-right text-rose-900">Pagos (-)</th>
+                                      <th className="px-3.5 py-2.5 text-right font-bold text-[#3e3a35]">Saldo Resultante ($)</th>
+                                      <th className="px-3.5 py-2.5">Observaciones</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {statement.map((s) => (
+                                      <tr key={s.id} className="hover:bg-[#faf7f2] transition-colors">
+                                        <td className="px-3.5 py-2.5 font-medium whitespace-nowrap text-[#3e3a35]">{s.fecha}</td>
+                                        <td className="px-3.5 py-2.5 font-medium text-[#3e3a35]">
+                                          <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                                            <span>{s.concepto}</span>
+                                            {s.subrubro && (
+                                              <span className="text-[10px] text-[#6b645c] bg-[#eae0cd]/50 px-1.5 py-0.5 rounded">
+                                                {s.subrubro}
+                                              </span>
+                                            )}
+                                            {s.esContado && (
+                                              <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                Contado
+                                              </span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-3.5 py-2.5">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                            s.cuenta?.toUpperCase() === 'PENDIENTE'
+                                              ? 'bg-amber-100 text-amber-900'
+                                              : s.cuenta?.toUpperCase() === 'BANCO'
+                                              ? 'bg-blue-100 text-blue-900'
+                                              : 'bg-emerald-100 text-emerald-900'
+                                          }`}>
+                                            {s.cuenta || '-'}
+                                          </span>
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-right font-mono font-semibold text-[#3e3a35]">
+                                          {s.cargo > 0 ? formatCurrency(s.cargo) : '-'}
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-right font-mono font-semibold text-emerald-700">
+                                          {s.abono > 0 ? formatCurrency(s.abono) : '-'}
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-xs">
+                                          <span className={s.saldo > 0 ? 'text-emerald-700' : s.saldo < 0 ? 'text-rose-700' : 'text-gray-500'}>
+                                            {s.saldo === 0 ? '$0' : formatCurrency(Math.abs(s.saldo))}
+                                          </span>
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-[#6b645c] max-w-[200px] truncate" title={s.observaciones}>
+                                          {s.observaciones || '-'}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     )}

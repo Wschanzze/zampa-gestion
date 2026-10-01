@@ -202,29 +202,9 @@ export const useSupabaseTransactions = () => {
       observaciones: payment.notes || (isCobro ? 'Cobro parcial a cuenta' : 'Pago parcial a proveedor')
     };
 
-    // 2. Offsetting entry in PENDIENTE to reduce outstanding debt
-    const pendingOffset = {
-      fecha: pgDate,
-      prov_cliente: payment.entity,
-      cuenta: 'PENDIENTE',
-      ingresos: isCobro ? 0 : payment.amount,
-      egresos: isCobro ? payment.amount : 0,
-      rubro: isCobro ? 'COBRO CUENTA CORRIENTE' : 'PAGO PROVEEDOR',
-      subactividad: subactividad,
-      subrubro_producto: null,
-      pecorino: 0,
-      manchego: 0,
-      saborizado: 0,
-      ahumado: 0,
-      provoleta: 0,
-      ricota: 0,
-      cantidades: 0,
-      observaciones: `Aplicaciﾃｳn de pago: ${payment.notes || (isCobro ? 'Cobro parcial' : 'Pago parcial')} (${payment.account})`
-    };
-
     const { data: insertedRows, error } = await supabase
       .from('zampa_transacciones')
-      .insert([realMovement, pendingOffset])
+      .insert([realMovement])
       .select();
 
     if (error) {

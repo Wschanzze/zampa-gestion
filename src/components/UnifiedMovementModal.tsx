@@ -807,7 +807,7 @@ const UnifiedMovementModal: React.FC<UnifiedMovementModalProps> = ({
                   <div>
                     <label className="block text-xs font-semibold text-[#6b645c] mb-1">Asignación Contable</label>
                     <div className="w-full bg-[#f4ebd8]/40 border border-[#e0d6c8] rounded-lg px-3 py-2 text-xs text-[#6b645c] font-medium flex items-center">
-                      <span>Doble asiento auto: Real ({paymentAccount}) + Compensatorio (PENDIENTE)</span>
+                      <span>Impacta en {paymentAccount} y cancela saldo de cuenta corriente</span>
                     </div>
                   </div>
                 </div>
