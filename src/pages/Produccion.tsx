@@ -29,18 +29,6 @@ import {
   BarChart3,
   Award
 } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend
-} from 'recharts';
 
 const Produccion = () => {
   const { data, loading, addRecord, updateRecord, deleteRecord } = useProduccion();
@@ -433,32 +421,6 @@ const Produccion = () => {
     XLSX.writeFile(workbook, `Produccion_Quesos_Zampa_${fechaHoy}.xlsx`);
   };
 
-  // Chart Data preparation
-  const chartData = useMemo(() => {
-    // Reverse to show chronological order from left to right, since data might be ordered descending
-    const sorted = [...filteredData].sort((a, b) => new Date(a.fecha_elaboracion).getTime() - new Date(b.fecha_elaboracion).getTime());
-    
-    // Group by date to sum liters and kg, then calculate yield per day
-    const grouped: Record<string, { fecha: string; litros: number; kg: number; lotes: number }> = {};
-    
-    sorted.forEach(row => {
-      const date = new Date(row.fecha_elaboracion + 'T12:00:00Z').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-      if (!grouped[date]) {
-        grouped[date] = { fecha: date, litros: 0, kg: 0, lotes: 0 };
-      }
-      grouped[date].litros += Number(row.litros_leche || 0);
-      grouped[date].kg += Number(row.kg_totales || 0);
-      grouped[date].lotes += 1;
-    });
-
-    return Object.values(grouped).map(day => ({
-      fecha: day.fecha,
-      Rendimiento: day.litros > 0 ? Number(((day.kg / day.litros) * 100).toFixed(2)) : 0,
-      Leche: day.litros,
-      Queso: day.kg
-    }));
-  }, [filteredData]);
-
   // Aggregation for Theoretical Stock in Chamber (now affected by date filters)
   const stockEstimado = useMemo(() => {
     const map = new Map();
@@ -743,167 +705,64 @@ const Produccion = () => {
 
       </div>
 
-      {/* Charts Section */}
-      {chartData.length > 0 && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Evolución del Rendimiento */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center gap-2">
-                  <TrendingUp size={20} className="text-[#8b7355]" />
-                  Evolución del Rendimiento (%)
-                </h3>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                  Promedio: {averageYield.toFixed(2)}%
-                </span>
-              </div>
-              <div className="h-64 sm:h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0d6c8" />
-                    <XAxis 
-                      dataKey="fecha" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fill: '#6b645c' }}
-                      dy={10}
-                    />
-                    <YAxis 
-                      yAxisId="left"
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fill: '#6b645c' }}
-                      tickFormatter={(val) => `${val}%`}
-                      domain={['auto', 'auto']}
-                    />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: '1px solid #e0d6c8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#2b2824', marginBottom: '4px' }}
-                      formatter={(val: any) => [`${val}%`, 'Rendimiento']}
-                    />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="Rendimiento" 
-                      name="Rendimiento (%)"
-                      stroke="#10b981" 
-                      strokeWidth={3}
-                      dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
-                      activeDot={{ r: 6, strokeWidth: 0 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+      {/* Comparativa por Variedad de Queso */}
+      {varietyStats.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-[#e0d6c8]">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center gap-2">
+                <BarChart3 size={20} className="text-[#8b7355]" />
+                Eficiencia y Rendimiento por Variedad de Queso
+              </h3>
+              <p className="text-xs text-[#6b645c] mt-0.5">Comparativa de volumen elaborado, aprovechamiento de leche (L/Kg) y rendimiento porcentual</p>
             </div>
-
-            {/* Producción Diaria (Kg) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center gap-2">
-                  <Scale size={20} className="text-[#8b7355]" />
-                  Producción Diaria (Kg)
-                </h3>
-                <span className="text-xs font-bold text-[#8b7355] bg-[#f4ebd8] px-2.5 py-1 rounded-lg border border-[#e0d6c8]">
-                  Total: {totalKg.toFixed(1)} Kg
-                </span>
-              </div>
-              <div className="h-64 sm:h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0d6c8" />
-                    <XAxis 
-                      dataKey="fecha" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fill: '#6b645c' }}
-                      dy={10}
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fill: '#6b645c' }}
-                    />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: '1px solid #e0d6c8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#2b2824', marginBottom: '4px' }}
-                      cursor={{ fill: '#f4ebd8', opacity: 0.4 }}
-                      formatter={(val: any) => [`${val} Kg`, 'Queso Producido']}
-                    />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                    <Bar 
-                      dataKey="Queso" 
-                      name="Queso Producido (Kg)" 
-                      fill="#8b7355" 
-                      radius={[4, 4, 0, 0]} 
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+            <span className="text-xs font-bold text-[#6b645c] bg-[#faf9f6] px-3 py-1.5 rounded-lg border border-[#e0d6c8]">
+              {varietyStats.length} {varietyStats.length === 1 ? 'variedad' : 'variedades'}
+            </span>
           </div>
 
-          {/* Comparativa por Variedad de Queso */}
-          {varietyStats.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-[#e0d6c8]">
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center gap-2">
-                    <BarChart3 size={20} className="text-[#8b7355]" />
-                    Eficiencia y Rendimiento por Variedad de Queso
-                  </h3>
-                  <p className="text-xs text-[#6b645c] mt-0.5">Comparativa de volumen elaborado, aprovechamiento de leche (L/Kg) y rendimiento porcentual</p>
-                </div>
-                <span className="text-xs font-bold text-[#6b645c] bg-[#faf9f6] px-3 py-1.5 rounded-lg border border-[#e0d6c8]">
-                  {varietyStats.length} {varietyStats.length === 1 ? 'variedad' : 'variedades'}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {varietyStats.map((item) => (
-                  <div key={item.variedad} className="bg-[#fcfbf9] border border-[#e0d6c8] rounded-xl p-4 space-y-3 hover:border-[#8b7355] transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${getBadgeColor(item.producto)}`}>
-                          {item.producto}
-                        </span>
-                        <h4 className="font-bold text-[#2b2824] text-sm">{item.variedad}</h4>
-                      </div>
-                      <span className="text-[11px] font-bold text-gray-500">
-                        {item.lotes} {item.lotes === 1 ? 'lote' : 'lotes'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#e0d6c8]/60 text-center">
-                      <div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400">Volumen</p>
-                        <p className="text-sm font-black text-[#2b2824] font-mono">{item.kg.toFixed(1)} <span className="text-[10px] font-normal text-gray-500">Kg</span></p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400">Rendimiento</p>
-                        <p className={`text-sm font-black font-mono ${item.rendimiento >= 12 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                          {item.rendimiento}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400">Consumo</p>
-                        <p className="text-sm font-black text-[#8b7355] font-mono">{item.litrosPorKg} <span className="text-[10px] font-normal text-gray-500">L/Kg</span></p>
-                      </div>
-                    </div>
-
-                    {/* Barra de proporción de producción */}
-                    <div className="w-full bg-[#e0d6c8]/50 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-[#8b7355] h-full rounded-full transition-all duration-500"
-                        style={{ width: `${totalKg > 0 ? Math.min(100, Math.round((item.kg / totalKg) * 100)) : 0}%` }}
-                      />
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {varietyStats.map((item) => (
+              <div key={item.variedad} className="bg-[#fcfbf9] border border-[#e0d6c8] rounded-xl p-4 space-y-3 hover:border-[#8b7355] transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${getBadgeColor(item.producto)}`}>
+                      {item.producto}
+                    </span>
+                    <h4 className="font-bold text-[#2b2824] text-sm">{item.variedad}</h4>
                   </div>
-                ))}
+                  <span className="text-[11px] font-bold text-gray-500">
+                    {item.lotes} {item.lotes === 1 ? 'lote' : 'lotes'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#e0d6c8]/60 text-center">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400">Volumen</p>
+                    <p className="text-sm font-black text-[#2b2824] font-mono">{item.kg.toFixed(1)} <span className="text-[10px] font-normal text-gray-500">Kg</span></p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400">Rendimiento</p>
+                    <p className={`text-sm font-black font-mono ${item.rendimiento >= 12 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {item.rendimiento}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400">Consumo</p>
+                    <p className="text-sm font-black text-[#8b7355] font-mono">{item.litrosPorKg} <span className="text-[10px] font-normal text-gray-500">L/Kg</span></p>
+                  </div>
+                </div>
+
+                {/* Barra de proporción de producción */}
+                <div className="w-full bg-[#e0d6c8]/50 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-[#8b7355] h-full rounded-full transition-all duration-500"
+                    style={{ width: `${totalKg > 0 ? Math.min(100, Math.round((item.kg / totalKg) * 100)) : 0}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
 
