@@ -346,15 +346,15 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
       .sort((a, b) => b.total - a.total);
   }, [ingresosList, tabTotalIngresos]);
 
-  // Egresos by Subactividad / Sector
-  const egresosBySubactividad = useMemo(() => {
+  // Egresos by Cuenta / Medio de Pago
+  const egresosByCuenta = useMemo(() => {
     const map: Record<string, { total: number; count: number }> = {};
     egresosList.forEach(row => {
-      const sub = row.Subactividad?.trim() || 'COMUN';
+      const cuenta = row.Cuenta?.trim() || 'Sin Especificar';
       const amt = parseCurrency(row.Egresos);
-      if (!map[sub]) map[sub] = { total: 0, count: 0 };
-      map[sub].total += amt;
-      map[sub].count += 1;
+      if (!map[cuenta]) map[cuenta] = { total: 0, count: 0 };
+      map[cuenta].total += amt;
+      map[cuenta].count += 1;
     });
     return Object.entries(map)
       .map(([name, stat]) => ({
@@ -934,7 +934,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
             </div>
 
 
-            {/* Row 3: Cobros por Medio vs Egresos por Sector */}
+            {/* Row 3: Cobros por Medio vs Pagos por Medio / Cuenta */}
             <div className={`grid grid-cols-1 ${viewMode === 'todos' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-4 sm:gap-6 items-stretch`}>
               {(viewMode === 'todos' || viewMode === 'ingresos') && (
                 <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
@@ -960,17 +960,15 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                 <div className="bg-white/95 rounded-xl border border-[#e0d6c8] p-3.5 sm:p-4 shadow-sm h-full flex flex-col justify-between">
                   <div>
                     <h5 className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
-                      <Layers size={13} className="text-rose-700" />
-                      <span>Egresos por Sector Productivo</span>
+                      <CreditCard size={13} className="text-rose-700" />
+                      <span>Pagos por Medio / Cuenta</span>
                     </h5>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {egresosBySubactividad.map(s => (
-                        <div key={s.name} className="p-2 sm:p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block mb-1 truncate ${getSubactividadBadgeClass(s.name)}`}>
-                            {s.name}
-                          </span>
-                          <p className="text-xs font-bold font-mono text-rose-800">{formatCurrency(s.total)}</p>
-                          <span className="text-[10px] text-[#6b645c]">{s.pct.toFixed(0)}% del total</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {egresosByCuenta.map(c => (
+                        <div key={c.name} className="p-2 sm:p-2.5 bg-[#faf9f6] rounded-lg border border-[#e0d6c8]/70 flex flex-col justify-between">
+                          <span className="text-[11px] font-bold text-[#2b2824] block truncate">{c.name}</span>
+                          <p className="text-xs font-bold font-mono text-rose-800 mt-1">{formatCurrency(c.total)}</p>
+                          <span className="text-[10px] text-[#6b645c]">{c.count} reg. ({c.pct.toFixed(0)}%)</span>
                         </div>
                       ))}
                     </div>
