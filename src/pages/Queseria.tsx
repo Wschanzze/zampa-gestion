@@ -73,8 +73,6 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
   // Total stock in chamber
   const totalStockCamara = Object.values(stockEstimado).reduce((acc, item) => acc + item.disponible, 0);
 
-  // Star cheese (highest sold)
-  const starCheese = [...variedades].sort((a, b) => totals[b] - totals[a])[0];
 
   // Color mapping for varieties
   const cheeseColors: Record<string, string> = {
@@ -114,7 +112,7 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
       </div>
 
       {/* Quick Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         
         {/* Total Stock in Chamber */}
         <div className="bg-white/95 p-4 rounded-xl border border-amber-300 shadow-sm relative overflow-hidden">
@@ -134,13 +132,6 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
           </div>
           <p className="text-2xl font-black text-emerald-700 mt-1">{formatKg(totals.totalKg)}</p>
           <span className="text-[11px] text-[#6b645c]">Suma de las 6 variedades</span>
-        </div>
-
-        {/* Star Variety */}
-        <div className="bg-white/95 p-4 rounded-xl border border-[#e0d6c8] shadow-sm">
-          <span className="text-[#6b645c] text-xs font-bold uppercase tracking-wider">Variedad Más Vendida</span>
-          <p className="text-xl font-black text-[#3e3a35] mt-1">{starCheese} ({formatKg(totals[starCheese])})</p>
-          <span className="text-[11px] text-[#6b645c]">Líder en volumen de ventas</span>
         </div>
 
         {/* Total Sales and Average Price */}
