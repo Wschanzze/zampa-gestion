@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useProduccion } from '../lib/api';
+import * as XLSX from 'xlsx';
 import { 
   Beaker, 
   Droplets, 
@@ -19,7 +20,13 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Search
+  Search,
+  Download,
+  AlertTriangle,
+  Boxes,
+  Milk,
+  BarChart3,
+  Award
 } from 'lucide-react';
 import {
   LineChart,
@@ -40,9 +47,11 @@ const Produccion = () => {
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [expandedStock, setExpandedStock] = useState<string | null>(null);
   
-  // Date filters
+  // Date filters & quick presets
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedVariedad, setSelectedVariedad] = useState('TODAS');
+  const [datePreset, setDatePreset] = useState<'ALL' | 'THIS_MONTH' | 'LAST_30' | 'THIS_YEAR'>('ALL');
 
   // Table sorting & quick search
   const [sortField, setSortField] = useState<'fecha' | 'lote' | 'litros_leche' | 'kg_totales' | 'rendimiento'>('fecha');
@@ -173,10 +182,45 @@ const Produccion = () => {
     }));
   };
 
+  const handlePresetChange = (preset: 'ALL' | 'THIS_MONTH' | 'LAST_30' | 'THIS_YEAR') => {
+    setDatePreset(preset);
+    const today = new Date();
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+    if (preset === 'ALL') {
+      setStartDate('');
+      setEndDate('');
+    } else if (preset === 'THIS_MONTH') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      setStartDate(formatDate(firstDay));
+      setEndDate(formatDate(today));
+    } else if (preset === 'LAST_30') {
+      const past30 = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      setStartDate(formatDate(past30));
+      setEndDate(formatDate(today));
+    } else if (preset === 'THIS_YEAR') {
+      const firstDayYear = new Date(today.getFullYear(), 0, 1);
+      setStartDate(formatDate(firstDayYear));
+      setEndDate(formatDate(today));
+    }
+  };
+
   const clearFilters = () => {
     setStartDate('');
     setEndDate('');
+    setSelectedVariedad('TODAS');
+    setDatePreset('ALL');
   };
+
+  // Unique list of cheese varieties in database
+  const availableVariedades = useMemo(() => {
+    const set = new Set<string>();
+    data.forEach(r => {
+      const v = (r.tipo_queso && r.tipo_queso.trim()) || r.producto;
+      if (v) set.add(v.trim().toUpperCase());
+    });
+    return Array.from(set).sort();
+  }, [data]);
 
   // Memoized filtered data
   const filteredData = useMemo(() => {
@@ -184,9 +228,13 @@ const Produccion = () => {
       const rowDate = row.fecha_elaboracion;
       if (startDate && rowDate < startDate) return false;
       if (endDate && rowDate > endDate) return false;
+      if (selectedVariedad !== 'TODAS') {
+        const v = ((row.tipo_queso && row.tipo_queso.trim()) || row.producto || '').toUpperCase();
+        if (v !== selectedVariedad) return false;
+      }
       return true;
     });
-  }, [data, startDate, endDate]);
+  }, [data, startDate, endDate, selectedVariedad]);
 
   // Memoized sorted and searched data for the table
   const sortedData = useMemo(() => {
@@ -232,10 +280,150 @@ const Produccion = () => {
   }, [filteredData, tableSearch, sortField, sortDirection]);
 
   // Derived metrics
-  const totalLitros = filteredData.reduce((acc, curr) => acc + Number(curr.litros_leche), 0);
-  const totalKg = filteredData.reduce((acc, curr) => acc + Number(curr.kg_totales), 0);
+  const totalLitros = filteredData.reduce((acc, curr) => acc + Number(curr.litros_leche || 0), 0);
+  const totalKg = filteredData.reduce((acc, curr) => acc + Number(curr.kg_totales || 0), 0);
   const averageYield = totalLitros > 0 ? (totalKg / totalLitros) * 100 : 0;
+  const litrosPorKg = totalKg > 0 ? totalLitros / totalKg : 0;
   const totalLotes = filteredData.length;
+
+  // Total de piezas físicas elaboradas (hormas grandes, barras, tubos, chicos, etc.)
+  const totalPiezas = filteredData.reduce((acc, curr) => {
+    return acc + 
+      (Number(curr.cantidad_grande) || 0) +
+      (Number(curr.cantidad_barra) || 0) +
+      (Number(curr.cantidad_tubo) || 0) +
+      (Number(curr.cantidad_chico) || 0) +
+      (Number(curr.cantidad_camambert) || 0) +
+      (Number(curr.cantidad_ricota) || 0) +
+      (Number(curr.cantidad_otro) || 0);
+  }, 0);
+
+  // Desglose de rendimiento y volumen por variedad
+  const varietyStats = useMemo(() => {
+    const map: Record<string, { variedad: string; producto: string; litros: number; kg: number; lotes: number }> = {};
+    
+    filteredData.forEach(row => {
+      const v = ((row.tipo_queso && row.tipo_queso.trim()) || row.producto || 'SIN ESPECIFICAR').toUpperCase();
+      if (!map[v]) {
+        map[v] = { variedad: v, producto: row.producto || 'SEMIDURO', litros: 0, kg: 0, lotes: 0 };
+      }
+      map[v].litros += Number(row.litros_leche || 0);
+      map[v].kg += Number(row.kg_totales || 0);
+      map[v].lotes += 1;
+    });
+
+    return Object.values(map)
+      .map(item => ({
+        ...item,
+        rendimiento: item.litros > 0 ? Number(((item.kg / item.litros) * 100).toFixed(2)) : 0,
+        litrosPorKg: item.kg > 0 ? Number((item.litros / item.kg).toFixed(2)) : 0
+      }))
+      .sort((a, b) => b.kg - a.kg);
+  }, [filteredData]);
+
+  // Helper de semáforo de maduración para lotes en cámara
+  const getMaduracionInfo = (variedad: string, category: string, dias: number) => {
+    const v = (variedad || '').toUpperCase();
+    const cat = (category || '').toUpperCase();
+    
+    let minDias = 30;
+    let maxDias = 75;
+
+    if (cat === 'DURO' || v.includes('PECORINO') || v.includes('SARDO') || v.includes('PARMESANO')) {
+      minDias = 60;
+      maxDias = 150;
+    } else if (cat === 'SEMIDURO' || v.includes('MANCHEGO') || v.includes('SABORIZADO') || v.includes('AHUMADO') || v.includes('PROVOLETA')) {
+      minDias = 30;
+      maxDias = 80;
+    } else if (cat === 'BLANDO' || v.includes('CAMEMBERT') || v.includes('BRIE') || v.includes('RICOTA') || v.includes('CUARTIROLO')) {
+      minDias = 10;
+      maxDias = 35;
+    }
+
+    const progreso = Math.min(100, Math.round((dias / minDias) * 100));
+
+    if (dias < minDias) {
+      return {
+        status: 'madurando' as const,
+        label: 'En Maduración',
+        diasRestantes: minDias - dias,
+        minDias,
+        maxDias,
+        progreso,
+        badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+        dotClass: 'bg-amber-500'
+      };
+    } else if (dias <= maxDias) {
+      return {
+        status: 'listo' as const,
+        label: 'Listo para Despacho',
+        diasRestantes: 0,
+        minDias,
+        maxDias,
+        progreso: 100,
+        badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        dotClass: 'bg-emerald-500'
+      };
+    } else {
+      return {
+        status: 'prolongado' as const,
+        label: 'Maduración Prolongada',
+        diasRestantes: 0,
+        minDias,
+        maxDias,
+        progreso: 100,
+        badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+        dotClass: 'bg-purple-500'
+      };
+    }
+  };
+
+  // Exportar registros a archivo Excel (.xlsx)
+  const exportToExcel = () => {
+    if (filteredData.length === 0) {
+      alert('No hay registros de producción para exportar con los filtros seleccionados.');
+      return;
+    }
+
+    const rows = sortedData.map(r => {
+      const l = Number(r.litros_leche) || 0;
+      const k = Number(r.kg_totales) || 0;
+      const rend = r.rendimiento ? Number(r.rendimiento) : (l > 0 ? (k / l) * 100 : 0);
+      const lPorKg = k > 0 ? (l / k) : 0;
+
+      return {
+        'Lote': r.lote,
+        'Fecha Elaboración': r.fecha_elaboracion,
+        'Categoría': r.producto,
+        'Variedad': r.tipo_queso || '-',
+        'Leche (L)': l,
+        'Queso (Kg)': k,
+        'Rendimiento (%)': Number(rend.toFixed(2)),
+        'Consumo (L/Kg)': Number(lPorKg.toFixed(2)),
+        'Hormas Grandes': r.cantidad_grande || 0,
+        'Hormas Barra': r.cantidad_barra || 0,
+        'Hormas Tubo': r.cantidad_tubo || 0,
+        'Hormas Chicos': r.cantidad_chico || 0,
+        'Camembert': r.cantidad_camambert || 0,
+        'Ricota': r.cantidad_ricota || 0,
+        'Otros': r.cantidad_otro || 0
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Elaboración');
+    
+    worksheet['!cols'] = [
+      { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 18 },
+      { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 16 },
+      { wch: 15 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+      { wch: 12 }, { wch: 10 }, { wch: 10 }
+    ];
+
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Produccion_Quesos_Zampa_${fechaHoy}.xlsx`);
+  };
 
   // Chart Data preparation
   const chartData = useMemo(() => {
@@ -250,8 +438,8 @@ const Produccion = () => {
       if (!grouped[date]) {
         grouped[date] = { fecha: date, litros: 0, kg: 0, lotes: 0 };
       }
-      grouped[date].litros += Number(row.litros_leche);
-      grouped[date].kg += Number(row.kg_totales);
+      grouped[date].litros += Number(row.litros_leche || 0);
+      grouped[date].kg += Number(row.kg_totales || 0);
       grouped[date].lotes += 1;
     });
 
@@ -305,7 +493,8 @@ const Produccion = () => {
         dias: diffDays,
         mermaPct: mermaPct * 100,
         kg_original: Number(row.kg_totales),
-        kg_estimado: currentKg
+        kg_estimado: currentKg,
+        maduracion: getMaduracionInfo(tipoUpper, category, diffDays)
       });
     });
 
@@ -346,12 +535,20 @@ const Produccion = () => {
             <Beaker className="text-[#8b7355]" size={28} />
             Producción y Rendimiento
           </h1>
-          <p className="text-[#8b7355] mt-1 text-sm md:text-base">Análisis de lotes elaborados, consumo de leche y eficiencia.</p>
+          <p className="text-[#8b7355] mt-1 text-sm md:text-base">Análisis de lotes elaborados, consumo de leche, maduración y eficiencia quesera.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={exportToExcel}
+            className="bg-[#faf9f6] hover:bg-[#f4ebd8] text-[#8b7355] border border-[#e0d6c8] px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all font-bold text-sm shadow-xs hover:border-[#8b7355]"
+            title="Exportar planilla de elaboración a Excel"
+          >
+            <Download size={17} />
+            <span>Exportar Excel</span>
+          </button>
           <button
             onClick={handleOpenNew}
-            className="bg-[#8b7355] hover:bg-[#735f46] text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide uppercase text-sm"
+            className="bg-[#8b7355] hover:bg-[#735f46] text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide uppercase text-sm"
           >
             <Plus size={18} strokeWidth={3} />
             Registrar Lote
@@ -359,185 +556,362 @@ const Produccion = () => {
         </div>
       </div>
 
-      {/* Filter Row */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#e0d6c8] flex flex-col sm:flex-row gap-4 items-end">
-        <div className="flex-1 space-y-1">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-            <Calendar size={14} /> Fecha Desde
-          </label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full bg-[#fcfbf9] border border-[#e0d6c8] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8b7355]/20 focus:border-[#8b7355] transition-all"
-          />
+      {/* Filter Row with Presets & Variety Dropdown */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-[#e0d6c8] space-y-4">
+        {/* Quick Date Presets */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#e0d6c8]/60">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-bold text-[#6b645c] uppercase tracking-wider mr-1">Período:</span>
+            {[
+              { id: 'ALL', label: 'Histórico Completo' },
+              { id: 'THIS_MONTH', label: 'Este Mes' },
+              { id: 'LAST_30', label: 'Últimos 30 días' },
+              { id: 'THIS_YEAR', label: 'Año en Curso' }
+            ].map(p => (
+              <button
+                key={p.id}
+                onClick={() => handlePresetChange(p.id as any)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  datePreset === p.id && !startDate && !endDate && p.id === 'ALL'
+                    ? 'bg-[#8b7355] text-white shadow-xs'
+                    : datePreset === p.id && p.id !== 'ALL'
+                    ? 'bg-[#8b7355] text-white shadow-xs'
+                    : 'bg-[#faf9f6] text-[#6b645c] hover:bg-[#f4ebd8] hover:text-[#2b2824] border border-[#e0d6c8]/60'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="text-xs text-[#8b7355] font-semibold">
+            {filteredData.length} {filteredData.length === 1 ? 'lote filtrado' : 'lotes filtrados'}
+          </div>
         </div>
-        <div className="flex-1 space-y-1">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-            <Calendar size={14} /> Fecha Hasta
-          </label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full bg-[#fcfbf9] border border-[#e0d6c8] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8b7355]/20 focus:border-[#8b7355] transition-all"
-          />
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={clearFilters}
-            disabled={!startDate && !endDate}
-            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 w-full sm:w-auto transition-all ${
-              startDate || endDate 
-              ? 'bg-[#f4ebd8] text-[#8b7355] hover:bg-[#e0d6c8] hover:text-[#2b2824]' 
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            <Filter size={16} />
-            Limpiar
-          </button>
+
+        {/* Custom Filter Inputs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+              <Calendar size={14} /> Fecha Desde
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setDatePreset('CUSTOM' as any);
+              }}
+              className="w-full bg-[#fcfbf9] border border-[#e0d6c8] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8b7355]/20 focus:border-[#8b7355] transition-all"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+              <Calendar size={14} /> Fecha Hasta
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setDatePreset('CUSTOM' as any);
+              }}
+              className="w-full bg-[#fcfbf9] border border-[#e0d6c8] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8b7355]/20 focus:border-[#8b7355] transition-all"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+              <Award size={14} /> Variedad / Queso
+            </label>
+            <select
+              value={selectedVariedad}
+              onChange={(e) => setSelectedVariedad(e.target.value)}
+              className="w-full bg-[#fcfbf9] border border-[#e0d6c8] rounded-lg px-3 py-2 text-sm font-semibold text-[#2b2824] focus:ring-2 focus:ring-[#8b7355]/20 focus:border-[#8b7355] transition-all"
+            >
+              <option value="TODAS">Todas las variedades ({availableVariedades.length})</option>
+              {availableVariedades.map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <button
+              onClick={clearFilters}
+              disabled={!startDate && !endDate && selectedVariedad === 'TODAS'}
+              className={`w-full py-2 px-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                startDate || endDate || selectedVariedad !== 'TODAS'
+                  ? 'bg-[#f4ebd8] text-[#8b7355] hover:bg-[#e0d6c8] hover:text-[#2b2824] border border-[#e0d6c8]' 
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+              }`}
+            >
+              <Filter size={15} />
+              <span>Limpiar Filtros</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-110 transition-transform duration-300"></div>
-          <div className="relative z-10 flex items-start justify-between">
+      {/* KPI Cards Grid (6 Métricas Clave) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+        
+        {/* Leche Procesada */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
+          <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-semibold text-gray-500">Leche Procesada</p>
-              <h3 className="text-2xl font-bold text-[#2b2824] mt-1">{totalLitros.toLocaleString()} L</h3>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Leche Procesada</p>
+              <h3 className="text-xl font-black text-[#2b2824] mt-1 font-mono">{totalLitros.toLocaleString()} L</h3>
+              <span className="text-[10px] text-gray-400">Total en el período</span>
             </div>
-            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-              <Droplets size={20} />
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+              <Droplets size={18} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-50 rounded-full group-hover:scale-110 transition-transform duration-300"></div>
-          <div className="relative z-10 flex items-start justify-between">
+        {/* Queso Producido */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
+          <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-semibold text-gray-500">Queso Producido</p>
-              <h3 className="text-2xl font-bold text-[#2b2824] mt-1">{totalKg.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Kg</h3>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Queso Producido</p>
+              <h3 className="text-xl font-black text-[#2b2824] mt-1 font-mono">
+                {totalKg.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Kg
+              </h3>
+              <span className="text-[10px] text-gray-400">Peso en fresco de tina</span>
             </div>
-            <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
-              <Scale size={20} />
+            <div className="p-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-100">
+              <Scale size={18} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full group-hover:scale-110 transition-transform duration-300"></div>
-          <div className="relative z-10 flex items-start justify-between">
+        {/* Rendimiento Promedio */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
+          <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-semibold text-gray-500">Rendimiento Prom.</p>
-              <h3 className="text-2xl font-bold text-[#2b2824] mt-1">{averageYield.toFixed(2)} %</h3>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Rendimiento Prom.</p>
+              <h3 className={`text-xl font-black mt-1 font-mono ${averageYield >= 12 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {averageYield.toFixed(2)} %
+              </h3>
+              <span className="text-[10px] text-gray-400">Kg queso / 100 L leche</span>
             </div>
-            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
-              <TrendingUp size={20} />
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+              <TrendingUp size={18} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-50 rounded-full group-hover:scale-110 transition-transform duration-300"></div>
-          <div className="relative z-10 flex items-start justify-between">
+        {/* Consumo Lácteo (L / Kg) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
+          <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-semibold text-gray-500">Lotes Totales</p>
-              <h3 className="text-2xl font-bold text-[#2b2824] mt-1">{totalLotes}</h3>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Consumo Lácteo</p>
+              <h3 className="text-xl font-black text-[#8b7355] mt-1 font-mono">
+                {litrosPorKg > 0 ? litrosPorKg.toFixed(2) : '-'} <span className="text-xs font-semibold">L/Kg</span>
+              </h3>
+              <span className="text-[10px] text-gray-400">Litros por cada kg</span>
             </div>
-            <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
-              <Layers size={20} />
+            <div className="p-2 bg-[#f4ebd8] text-[#8b7355] rounded-xl border border-[#e0d6c8]">
+              <Milk size={18} />
             </div>
           </div>
         </div>
+
+        {/* Hormas / Piezas Físicas */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Piezas Elaboradas</p>
+              <h3 className="text-xl font-black text-[#2b2824] mt-1 font-mono">
+                {totalPiezas.toLocaleString()} <span className="text-xs font-semibold">U</span>
+              </h3>
+              <span className="text-[10px] text-gray-400">Grandes, barras, tubos, etc.</span>
+            </div>
+            <div className="p-2 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
+              <Boxes size={18} />
+            </div>
+          </div>
+        </div>
+
+        {/* Lotes Totales */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-4 relative overflow-hidden group">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Lotes Totales</p>
+              <h3 className="text-xl font-black text-[#2b2824] mt-1 font-mono">{totalLotes}</h3>
+              <span className="text-[10px] text-gray-400">Elaboraciones registradas</span>
+            </div>
+            <div className="p-2 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
+              <Layers size={18} />
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      {/* Chart Section */}
+      {/* Charts Section */}
       {chartData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
-            <h3 className="text-lg font-bold text-[#2b2824] mb-6 flex items-center gap-2">
-              <TrendingUp size={20} className="text-[#8b7355]" />
-              Evolución del Rendimiento
-            </h3>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0d6c8" />
-                  <XAxis 
-                    dataKey="fecha" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b645c' }}
-                    dy={10}
-                  />
-                  <YAxis 
-                    yAxisId="left"
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b645c' }}
-                    tickFormatter={(val) => `${val}%`}
-                    domain={['auto', 'auto']}
-                  />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #e0d6c8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#2b2824', marginBottom: '4px' }}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="Rendimiento" 
-                    name="Rendimiento (%)"
-                    stroke="#10b981" 
-                    strokeWidth={3}
-                    dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Evolución del Rendimiento */}
+            <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center gap-2">
+                  <TrendingUp size={20} className="text-[#8b7355]" />
+                  Evolución del Rendimiento (%)
+                </h3>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  Promedio: {averageYield.toFixed(2)}%
+                </span>
+              </div>
+              <div className="h-64 sm:h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0d6c8" />
+                    <XAxis 
+                      dataKey="fecha" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 12, fill: '#6b645c' }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 12, fill: '#6b645c' }}
+                      tickFormatter={(val) => `${val}%`}
+                      domain={['auto', 'auto']}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #e0d6c8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#2b2824', marginBottom: '4px' }}
+                      formatter={(val: any) => [`${val}%`, 'Rendimiento']}
+                    />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="Rendimiento" 
+                      name="Rendimiento (%)"
+                      stroke="#10b981" 
+                      strokeWidth={3}
+                      dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
+                      activeDot={{ r: 6, strokeWidth: 0 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Producción Diaria (Kg) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center gap-2">
+                  <Scale size={20} className="text-[#8b7355]" />
+                  Producción Diaria (Kg)
+                </h3>
+                <span className="text-xs font-bold text-[#8b7355] bg-[#f4ebd8] px-2.5 py-1 rounded-lg border border-[#e0d6c8]">
+                  Total: {totalKg.toFixed(1)} Kg
+                </span>
+              </div>
+              <div className="h-64 sm:h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0d6c8" />
+                    <XAxis 
+                      dataKey="fecha" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 12, fill: '#6b645c' }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 12, fill: '#6b645c' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #e0d6c8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#2b2824', marginBottom: '4px' }}
+                      cursor={{ fill: '#f4ebd8', opacity: 0.4 }}
+                      formatter={(val: any) => [`${val} Kg`, 'Queso Producido']}
+                    />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                    <Bar 
+                      dataKey="Queso" 
+                      name="Queso Producido (Kg)" 
+                      fill="#8b7355" 
+                      radius={[4, 4, 0, 0]} 
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
-            <h3 className="text-lg font-bold text-[#2b2824] mb-6 flex items-center gap-2">
-              <Scale size={20} className="text-[#8b7355]" />
-              Producción por Día
-            </h3>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0d6c8" />
-                  <XAxis 
-                    dataKey="fecha" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b645c' }}
-                    dy={10}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b645c' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #e0d6c8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#2b2824', marginBottom: '4px' }}
-                    cursor={{ fill: '#f4ebd8', opacity: 0.4 }}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                  <Bar 
-                    dataKey="Queso" 
-                    name="Queso Producido (Kg)" 
-                    fill="#8b7355" 
-                    radius={[4, 4, 0, 0]} 
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Comparativa por Variedad de Queso */}
+          {varietyStats.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-[#e0d6c8] p-5 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-[#e0d6c8]">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-[#2b2824] flex items-center gap-2">
+                    <BarChart3 size={20} className="text-[#8b7355]" />
+                    Eficiencia y Rendimiento por Variedad de Queso
+                  </h3>
+                  <p className="text-xs text-[#6b645c] mt-0.5">Comparativa de volumen elaborado, aprovechamiento de leche (L/Kg) y rendimiento porcentual</p>
+                </div>
+                <span className="text-xs font-bold text-[#6b645c] bg-[#faf9f6] px-3 py-1.5 rounded-lg border border-[#e0d6c8]">
+                  {varietyStats.length} {varietyStats.length === 1 ? 'variedad' : 'variedades'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {varietyStats.map((item) => (
+                  <div key={item.variedad} className="bg-[#fcfbf9] border border-[#e0d6c8] rounded-xl p-4 space-y-3 hover:border-[#8b7355] transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${getBadgeColor(item.producto)}`}>
+                          {item.producto}
+                        </span>
+                        <h4 className="font-bold text-[#2b2824] text-sm">{item.variedad}</h4>
+                      </div>
+                      <span className="text-[11px] font-bold text-gray-500">
+                        {item.lotes} {item.lotes === 1 ? 'lote' : 'lotes'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#e0d6c8]/60 text-center">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400">Volumen</p>
+                        <p className="text-sm font-black text-[#2b2824] font-mono">{item.kg.toFixed(1)} <span className="text-[10px] font-normal text-gray-500">Kg</span></p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400">Rendimiento</p>
+                        <p className={`text-sm font-black font-mono ${item.rendimiento >= 12 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {item.rendimiento}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400">Consumo</p>
+                        <p className="text-sm font-black text-[#8b7355] font-mono">{item.litrosPorKg} <span className="text-[10px] font-normal text-gray-500">L/Kg</span></p>
+                      </div>
+                    </div>
+
+                    {/* Barra de proporción de producción */}
+                    <div className="w-full bg-[#e0d6c8]/50 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-[#8b7355] h-full rounded-full transition-all duration-500"
+                        style={{ width: `${totalKg > 0 ? Math.min(100, Math.round((item.kg / totalKg) * 100)) : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -572,8 +946,24 @@ const Produccion = () => {
                         </span>
                         <h4 className="text-lg font-bold text-[#2b2824]">{stock.variedad}</h4>
                       </div>
-                      <p className="text-sm text-gray-500 font-medium">
-                        {stock.lotes.length} {stock.lotes.length === 1 ? 'lote' : 'lotes'} en cámara
+                      <p className="text-sm text-gray-500 font-medium flex flex-wrap items-center gap-1.5">
+                        <span>{stock.lotes.length} {stock.lotes.length === 1 ? 'lote' : 'lotes'} en cámara</span>
+                        {(() => {
+                          const listos = stock.lotes.filter((l: any) => l.maduracion?.status === 'listo' || l.maduracion?.status === 'prolongado').length;
+                          const madurando = stock.lotes.filter((l: any) => l.maduracion?.status === 'madurando').length;
+                          return (
+                            <>
+                              <span className="text-gray-300">·</span>
+                              <span className="text-emerald-700 font-semibold">{listos} listos</span>
+                              {madurando > 0 && (
+                                <>
+                                  <span className="text-gray-300">·</span>
+                                  <span className="text-amber-700 font-semibold">{madurando} en maduración</span>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
                       </p>
                     </div>
                  </div>
@@ -601,33 +991,48 @@ const Produccion = () => {
                         <tr className="text-gray-500 border-b border-[#e0d6c8]">
                           <th className="pb-3 px-2 font-semibold">Lote</th>
                           <th className="pb-3 px-2 font-semibold">Elaboración</th>
+                          <th className="pb-3 px-2 font-semibold text-center">Estado Maduración</th>
                           <th className="pb-3 px-2 font-semibold text-right">Tiempo en Cámara</th>
                           <th className="pb-3 px-2 font-semibold text-right">Merma %</th>
                           <th className="pb-3 px-2 font-semibold text-right">Kg Iniciales</th>
-                          <th className="pb-3 px-2 font-semibold text-right">Kg Actuales</th>
+                          <th className="pb-3 px-2 font-semibold text-right">Kg Estimados</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {stock.lotes.map((lote: any, i: number) => (
-                          <tr key={lote.lote + '-' + i} className="hover:bg-white transition-colors">
-                            <td className="py-2.5 px-2 font-bold text-[#2b2824]">{lote.lote}</td>
-                            <td className="py-2.5 px-2 text-gray-600 font-medium">
-                              {new Date(lote.fecha + 'T12:00:00Z').toLocaleDateString('es-AR')}
-                            </td>
-                            <td className="py-2.5 px-2 text-right font-medium text-blue-600 bg-blue-50/30">
-                              {lote.dias} días
-                            </td>
-                            <td className="py-2.5 px-2 text-right text-red-500 font-medium bg-red-50/30">
-                              -{lote.mermaPct.toFixed(1)}%
-                            </td>
-                            <td className="py-2.5 px-2 text-right text-gray-500 font-semibold">
-                              {lote.kg_original.toFixed(2)}
-                            </td>
-                            <td className="py-2.5 px-2 text-right font-bold text-[#2b2824]">
-                              {lote.kg_estimado.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
+                        {stock.lotes.map((lote: any, i: number) => {
+                          const mad = lote.maduracion;
+                          return (
+                            <tr key={lote.lote + '-' + i} className="hover:bg-white transition-colors">
+                              <td className="py-2.5 px-2 font-bold text-[#2b2824]">{lote.lote}</td>
+                              <td className="py-2.5 px-2 text-gray-600 font-medium">
+                                {new Date(lote.fecha + 'T12:00:00Z').toLocaleDateString('es-AR')}
+                              </td>
+                              <td className="py-2.5 px-2 text-center">
+                                {mad && (
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-bold rounded-full border ${mad.badgeClass}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${mad.dotClass}`}></span>
+                                    <span>{mad.label}</span>
+                                    {mad.status === 'madurando' && (
+                                      <span className="text-[10px] font-medium opacity-80">({mad.diasRestantes}d)</span>
+                                    )}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-medium text-blue-600 bg-blue-50/30">
+                                {lote.dias} días
+                              </td>
+                              <td className="py-2.5 px-2 text-right text-red-500 font-medium bg-red-50/30">
+                                -{lote.mermaPct.toFixed(1)}%
+                              </td>
+                              <td className="py-2.5 px-2 text-right text-gray-500 font-semibold">
+                                {lote.kg_original.toFixed(2)}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-bold text-[#2b2824]">
+                                {lote.kg_estimado.toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                  </div>
@@ -789,12 +1194,20 @@ const Produccion = () => {
                     )}
                   </div>
                 </th>
+                <th className="px-6 py-4 font-semibold text-right" title="Litros de leche necesarios por cada kg de queso">
+                  Consumo (L/Kg)
+                </th>
                 <th className="px-6 py-4 font-semibold text-center">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0d6c8]/60">
               {sortedData.map((row) => {
-                const yieldVal = row.rendimiento ? Number(row.rendimiento) : ((row.kg_totales / row.litros_leche) * 100);
+                const litros = Number(row.litros_leche) || 0;
+                const kg = Number(row.kg_totales) || 0;
+                const yieldVal = row.rendimiento ? Number(row.rendimiento) : (litros > 0 ? (kg / litros) * 100 : 0);
+                const lPorKg = kg > 0 ? (litros / kg) : 0;
+                const isAtipico = yieldVal > 0 && (yieldVal < 8.5 || yieldVal > 18.0);
+
                 return (
                   <tr key={row.id} className="hover:bg-gray-50/80 transition-colors group">
                     <td className="px-6 py-4 text-sm text-[#4a443c] font-medium">
@@ -814,15 +1227,28 @@ const Produccion = () => {
                       {row.tipo_queso || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-right font-semibold text-[#2b2824]">
-                      {Number(row.litros_leche).toLocaleString()}
+                      {litros.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-sm text-right font-semibold text-[#2b2824]">
-                      {Number(row.kg_totales).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                      {kg.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
-                      <span className={`font-bold ${yieldVal > 15 ? 'text-emerald-600' : yieldVal > 10 ? 'text-amber-600' : 'text-red-500'}`}>
-                        {yieldVal.toFixed(2)}%
-                      </span>
+                      <div className="inline-flex items-center justify-end gap-1">
+                        <span className={`font-bold ${yieldVal > 15 ? 'text-emerald-600' : yieldVal > 10 ? 'text-amber-600' : 'text-red-500'}`}>
+                          {yieldVal.toFixed(2)}%
+                        </span>
+                        {isAtipico && (
+                          <span 
+                            className="text-amber-500 cursor-help" 
+                            title="Rendimiento atípico (<8.5% o >18%). Verificar cuajada o pesaje."
+                          >
+                            <AlertTriangle size={13} />
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-right font-mono font-semibold text-[#8b7355]">
+                      {lPorKg > 0 ? lPorKg.toFixed(2) : '-'}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center space-x-1.5">
@@ -851,7 +1277,7 @@ const Produccion = () => {
               })}
               {sortedData.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={9} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Filter size={48} className="mb-4 text-[#e0d6c8]" />
                       <p className="text-lg font-medium text-[#6b645c]">No hay registros para este filtro</p>
