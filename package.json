@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.13.0",
     "@supabase/supabase-js": "^2.117.1",
     "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",
@@ -27,11 +28,13 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-legacy": "^8.2.3",
     "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.6.1",
     "oxlint": "^1.81.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
+    "terser": "^5.51.2",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }
