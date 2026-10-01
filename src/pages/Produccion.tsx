@@ -432,8 +432,8 @@ const Produccion = () => {
       const diffTime = today.getTime() - elaborationDate.getTime();
       const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
       
-      // Merma: 20% a los 60 días -> 0.20 / 60 por día. Cap en 35% de merma max para no desaparecer el queso.
-      const mermaPct = Math.min((diffDays / 60) * 0.20, 0.35);
+      // Merma: 22% a los 45 días -> se incrementa progresivamente hasta llegar al 22% a los 45 días y se frene ahí (cap 0.22)
+      const mermaPct = Math.min((diffDays / 45) * 0.22, 0.22);
       const currentKg = Number(row.kg_totales) * (1 - mermaPct);
 
       const rawTipo = row.tipo_queso && row.tipo_queso.trim() !== '' ? row.tipo_queso.trim() : (row.producto || 'Sin Variedad');
@@ -775,7 +775,7 @@ const Produccion = () => {
           </h3>
           <span className="text-xs text-[#8b7355] font-semibold bg-[#f4ebd8]/50 px-3 py-1.5 rounded-lg border border-[#e0d6c8] flex items-center gap-2 shadow-sm">
             <TrendingUp size={14} className="text-red-400" />
-            Contempla 20% merma a 60 días
+            Contempla 22% merma a 45 días (máx 22%)
           </span>
         </div>
         <div className="p-5 flex flex-col gap-4 bg-gray-50/30">

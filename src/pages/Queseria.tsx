@@ -53,7 +53,7 @@ const Queseria: React.FC<QueseriaProps> = ({ data }) => {
         const elaborationDate = new Date(row.fecha_elaboracion + 'T12:00:00Z');
         const diffTime = today.getTime() - elaborationDate.getTime();
         const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-        const mermaPct = Math.min((diffDays / 60) * 0.20, 0.35); // Max 35% shrinkage
+        const mermaPct = Math.min((diffDays / 45) * 0.22, 0.22); // Merma: 22% a los 45 días (máx 22% cap)
         const currentKg = Number(row.kg_totales) * (1 - mermaPct);
 
         stockMap[key].producido += Number(row.kg_totales);
