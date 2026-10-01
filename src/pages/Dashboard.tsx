@@ -139,13 +139,6 @@ const getCuentaBadgeClass = (cuenta?: string) => {
   return 'bg-[#f4ebd8] text-[#8b7355] border-[#e0d6c8]';
 };
 
-const getSubactividadBadgeClass = (sub?: string) => {
-  const s = sub?.toUpperCase() || '';
-  if (s.includes('TAMBO')) return 'bg-amber-100 text-amber-900 border-amber-300';
-  if (s.includes('QUESERIA') || s.includes('QUESERÍA')) return 'bg-emerald-100 text-emerald-900 border-emerald-300';
-  if (s.includes('RECRIA') || s.includes('RECRÍA')) return 'bg-sky-100 text-sky-900 border-sky-300';
-  return 'bg-stone-100 text-stone-700 border-stone-200';
-};
 
 // Helper for extracting cheese details from a transaction
 interface CheeseDetail {
@@ -1192,8 +1185,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onNavigateToCuentas }) => {
                                 <span className="font-bold text-xs sm:text-sm text-[#2b2824] truncate">
                                   {item['Prov/Cliente'] || 'Proveedor'}
                                 </span>
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getSubactividadBadgeClass(item.Subactividad)}`}>
-                                  {item.Subactividad || 'COMUN'}
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${getCuentaBadgeClass(item.Cuenta)}`}>
+                                  {item.Cuenta || 'N/A'}
                                 </span>
                               </div>
 
