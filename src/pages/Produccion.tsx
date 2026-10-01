@@ -43,7 +43,7 @@ const Produccion = () => {
   const [datePreset, setDatePreset] = useState<'ALL' | 'THIS_MONTH' | 'LAST_30' | 'THIS_YEAR'>('ALL');
 
   // Table sorting & quick search
-  const [sortField, setSortField] = useState<'fecha' | 'lote' | 'litros_leche' | 'kg_totales' | 'rendimiento'>('fecha');
+  const [sortField, setSortField] = useState<'fecha' | 'lote' | 'litros_leche' | 'kg_totales' | 'rendimiento'>('lote');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [tableSearch, setTableSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,7 +54,7 @@ const Produccion = () => {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection(field === 'lote' ? 'asc' : 'desc');
+      setSortDirection('desc');
     }
   };
 
